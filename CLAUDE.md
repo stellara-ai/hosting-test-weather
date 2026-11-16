@@ -22,7 +22,7 @@
   a secret without exposing it, a table protected by row-level security, and sign-in
   email sent through Votel using Supabase's Send Email hook.
 - **Current state: stage one is implemented and passed. Stage two is built and deployed
-  to Supabase, and six of its ten checks have passed (see below).** Stage one is a weather lookup
+  to Supabase, and eight of its ten checks have passed (see below).** Stage one is a weather lookup
   (Open-Meteo, no API key) with routes `/`, `/saved`, `/city/:name` and a not-found
   page. Stage two adds `/sign-in`, a guarded `/account`, `src/services/backend.ts`
   (the only file that talks to Supabase) and the `supabase/` folder (one migration,
@@ -79,7 +79,7 @@ Votel Web App at `weather-test.stellarasystems.com`:
 
 ## Stage two plan
 
-**Status: built and deployed; six of ten checks passed as of 2026-11-16.** The `notes`
+**Status: built and deployed; eight of ten checks passed as of 2026-11-16.** The `notes`
 migration is applied, `secret-check` and `send-email` are deployed, the Send Email hook
 is enabled and the secrets are set. The stage two app has only been run on the local dev
 server, not yet published to Votel.
@@ -128,11 +128,11 @@ stage one app, using a free Supabase project.
 
 - [x] Sign in, refresh, still signed in; sign out works (owner, local dev server, 2026-11-16)
 - [x] `secret-check` returns found when signed in, and is refused when signed out (2026-11-16)
-- [ ] A second user cannot see the first user's notes
+- [x] A second user cannot see the first user's notes (owner, second account saw no notes, 2026-11-16)
 - [x] The `TEST_SECRET` value appears nowhere in the build output (2026-11-16)
 - [x] A code arrives at an address that is not a Supabase team member (2026-11-15)
 - [ ] Arrival time measured on five attempts
-- [ ] A code arrives at an address that is not a Votel contact
+- [x] A code arrives at an address that is not a Votel contact (2026-11-16)
 - [ ] A code arrives for a Votel contact who unsubscribed from marketing email
 - [ ] A wrong Votel API key gives a clear failure, logged without secrets
 - [x] A request to `send-email` without a valid hook signature is rejected (2026-11-15)

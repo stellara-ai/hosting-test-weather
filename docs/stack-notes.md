@@ -6,7 +6,7 @@ once the test app is hardened; until then this file is updated in place as thing
 proven or disproven.
 
 Last updated: 2026-11-16. Stage one (hosting) is complete. Stage two (sign-in, secrets,
-data security, email) is built and deployed; six of its ten checks have passed.
+data security, email) is built and deployed; eight of its ten checks have passed.
 
 ## How to read the status labels
 
@@ -227,8 +227,35 @@ Caveats to settle before the product relies on it:
   email. Asked of Votel support; treat as Open.
 - It still needs the Admin key.
 - The code is stored in Votel's sent-message history. It is single use and short lived.
-- Whether Votel honoured `from_email` and `is_marketing: false` has not been confirmed
-  from a received email yet.
+- Read from the headers of a received email (2026-11-16):
+  - `from_email` and `from_name` are honoured: From was "Stellara Systems" at
+    `support@stellarasystems.com`, with the same Reply-To.
+  - SPF, DKIM and DMARC all pass for `stellarasystems.com`. The domain's DMARC policy is
+    `p=none`, which is monitoring only.
+  - Votel sends through Mailgun. Transit was one second from creation to the receiving
+    mail server.
+  - No "[TEST]" marker in the subject, and no unsubscribe footer.
+  - Votel adds its own open-tracking pixel, served from `app.stellaralegal.com`, even
+    though Mailgun's tracking headers are off. A sign-in email should carry no tracking,
+    and the pixel's domain differs from the sending domain. No way to disable it was
+    found: the send request has no tracking field, the General, CAN-SPAM and
+    Integrations settings pages have no toggle, and the help docs have no article.
+    Asked of Votel support.
+  - Votel also generates a plain-text part from the HTML.
+- **Held by the receiving mail system (observed 2026-11-16).** A code sent to the
+  owner's own address, on a business domain hosted on Zoho Mail, did not appear, though
+  Votel answered with success. After the owner added `stellarasystems.com` to that
+  mailbox's Zoho allowed-domains list, the held email appeared together with a fresh
+  one. The fresh one's headers show one second of transit and passing SPF, DKIM and
+  DMARC, so the hold was Zoho's filtering of a new sender, not Votel and not an
+  authentication failure. Codes to a personal Gmail, to a third person's address and to
+  a subscribed Votel contact all arrived promptly. Lesson for the product: customers'
+  mail systems will judge these emails the same way and cannot be allow-listed by us, so
+  sender reputation, a dedicated sending subdomain and visible delivery logs matter.
+- **No audit trail.** Sends through `/api/emails/test` do not appear in Votel's message
+  activity log, delivered or not, so there is nowhere to check what happened to one.
+  The function sees only the HTTP status. For a product this means a sign-in email can
+  vanish with no error on either side.
 - Fallback if Votel says no: a transactional provider as Supabase custom SMTP. Resend's
   free plan (3,000 a month, 100 a day) costs nothing at this volume and needs no Edge
   Function, hook or Admin key.
@@ -300,11 +327,11 @@ Stage two:
 | `secret-check` returns found when signed in | Pass (owner pressed "Run secret check" on the Account page) |
 | Sign in with an emailed code | Pass (owner signed in on the local dev server with a code sent through Votel) |
 | Refresh, still signed in; sign out works | Pass (owner-reported, local dev server) |
-| A second user cannot see the first user's notes | Not run (signed-out read is refused with `42501`) |
+| A second user cannot see the first user's notes | Pass (a second account's Account page showed no notes; owner-reported. A signed-out read is refused with `42501`) |
 | The `TEST_SECRET` value appears nowhere in the build output | Pass (secret set to a fresh 40-character value, app rebuilt, zero matches in `dist` and in the repository; the same search does find the publishable key, so the search works) |
 | A code arrives at an address that is not a Supabase team member | Pass (a Gmail address outside the Supabase organization) |
 | Arrival time measured on five attempts | Not run |
-| A code arrives at an address that is not a Votel contact | Not run |
+| A code arrives at an address that is not a Votel contact | Pass (owner confirmed the address is not in Votel's contacts) |
 | A code arrives for a Votel contact who unsubscribed from marketing email | Not run |
 | A wrong Votel API key gives a clear failure, logged without secrets | Not run (a valid Viewer key gave a clean 403 log line, which is related but not this check) |
 
