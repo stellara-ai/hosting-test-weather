@@ -24,3 +24,4 @@ coverage
 *.tsbuildinfo
 .eslintcache
 *.timestamp-*-*.mjs
+.playwright-mcp

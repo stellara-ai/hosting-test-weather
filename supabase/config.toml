@@ -1,0 +1,14 @@
+#:schema https://supabase.com/schemas/config/v1.json
+# Settings not listed here use the CLI defaults:
+# https://supabase.com/docs/guides/local-development/cli/config
+project_id = "hosting-test-weather"
+
+# Called by signed-in users from the app. The platform rejects requests
+# without a valid user JWT before the function runs.
+[functions.secret-check]
+verify_jwt = true
+
+# Called by Supabase Auth's Send Email hook, which sends no user JWT.
+# The function verifies the hook signature itself.
+[functions.send-email]
+verify_jwt = false

@@ -20,6 +20,13 @@ import UnitToggle from '@/components/UnitToggle.vue'
         >
           Saved
         </RouterLink>
+        <RouterLink
+          :to="{ name: 'account' }"
+          class="py-2 text-slate-600 hover:text-slate-900"
+          active-class="text-sky-700"
+        >
+          Account
+        </RouterLink>
       </nav>
       <UnitToggle />
     </div>

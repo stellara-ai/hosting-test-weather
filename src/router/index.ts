@@ -1,6 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { useAuthStore } from '@/stores/auth'
 import HomeView from '@/views/HomeView.vue'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Only signed-in users may open the route. */
+    requiresAuth?: boolean
+    /** Signed-in users are sent on to their account instead. */
+    guestOnly?: boolean
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,11 +24,36 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/sign-in',
+      name: 'sign-in',
+      component: () => import('@/views/SignInView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/account',
+      name: 'account',
+      component: () => import('@/views/AccountView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth && !to.meta.guestOnly) return true
+
+  const auth = useAuthStore()
+  await auth.init()
+
+  if (to.meta.requiresAuth && !auth.isSignedIn) {
+    return { name: 'sign-in', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.guestOnly && auth.isSignedIn) return { name: 'account' }
+  return true
 })
 
 export default router

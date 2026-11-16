@@ -50,7 +50,41 @@ or refreshed directly.
 Saved cities and the unit preference live in `localStorage`, which is per origin,
 so each subdomain keeps its own list.
 
+## Stage two: Supabase sign-in, secrets and data security
+
+The app also has `/sign-in` (emailed one-time code) and a guarded `/account` page with a
+secret check and private notes. It needs two more public build-time variables,
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`). Without
+them the weather pages still work and sign-in shows a "not configured" message.
+
+The backend lives in `supabase/`:
+
+- `migrations/`: the `notes` table, its grants and row-level security policies.
+- `functions/secret-check`: signed-in callers only; returns `{ found, length }` for the
+  `TEST_SECRET` secret, never its value.
+- `functions/send-email`: Supabase's Send Email hook. Verifies the hook signature, then
+  sends the code through Votel. The provider sits behind `functions/_shared/emailSender.ts`.
+
+Deploying it (each step changes the Supabase project, so run them deliberately):
+
+```sh
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push
+npx supabase functions deploy secret-check --use-api
+npx supabase functions deploy send-email --use-api
+npx supabase secrets set TEST_SECRET=... VOTEL_API_HOST=... VOTEL_API_KEY=... \
+  VOTEL_OTP_TEMPLATE_KEY=... SEND_EMAIL_HOOK_SECRET=...
+```
+
+Then enable the Send Email hook in the Supabase dashboard (Authentication, Hooks),
+pointing at the `send-email` function URL. Secrets are set only in Supabase; none of
+them belongs in this repository or in a `VITE_` variable.
+
 ## Where things are
+
+- `src/services/backend.ts`: the only file that talks to Supabase.
+- `src/stores/auth.ts`: the signed-in user, restored on load.
 
 - `src/services/weather.ts`: the only file that calls the weather API. Swap the provider here.
 - `src/composables/useWeather.ts`: fetches weather for a city and tracks loading, empty and error states.

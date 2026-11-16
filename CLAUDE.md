@@ -16,9 +16,12 @@
 - **Stage two, platform:** Supabase sign-in by emailed code, an Edge Function that reads
   a secret without exposing it, a table protected by row-level security, and sign-in
   email sent through Votel using Supabase's Send Email hook.
-- **Current state: the code implements stage one only.** It is a weather lookup
-  (Open-Meteo, no API key) with routes `/`, `/saved`, `/city/:name` and a not-found page.
-  There is no Supabase code, no auth and no backend.
+- **Current state: stage one is implemented and passed. Stage two code is written but
+  not deployed, and none of its checks have been run.** Stage one is a weather lookup
+  (Open-Meteo, no API key) with routes `/`, `/saved`, `/city/:name` and a not-found
+  page. Stage two adds `/sign-in`, a guarded `/account`, `src/services/backend.ts`
+  (the only file that talks to Supabase) and the `supabase/` folder (one migration,
+  two Edge Functions).
 
 ## Stack
 
@@ -26,6 +29,8 @@ Vue 3 with `<script setup>`, TypeScript strict, Vite, Vue Router in history mode
 Tailwind CSS. Versions from `package.json`: vue `^3.5.42`, vue-router `^5.3.1`, pinia
 `^4.0.3`, vite `^8.2.2`, tailwindcss and @tailwindcss/vite `^4.3.5`, typescript `~6.0.0`,
 vue-tsc `^3.3.11`, vitest `^4.1.11`, eslint `^10.10.0`. Node `^22.18.0 || >=24.12.0`.
+Stage two adds @supabase/supabase-js `^2.119.0`, the Supabase CLI (`supabase` `^3.1.0`,
+dev only) and, inside the `send-email` function only, `npm:standardwebhooks@1`.
 
 ## How it is built and deployed
 
@@ -69,7 +74,8 @@ Votel Web App at `weather-test.stellarasystems.com`:
 
 ## Stage two plan
 
-**Status: not yet started.** Nothing below exists in the code.
+**Status: code written, not deployed, no checks run.** Nothing has been applied to the
+Supabase project: no migration pushed, no function deployed, no secret or hook set.
 
 **Goal:** prove Supabase login, secrets, data security and sign-in email, on top of the
 stage one app, using a free Supabase project.
@@ -87,6 +93,21 @@ stage one app, using a free Supabase project.
     header and a body of `template_key`, `recipient.email` and `variables.code`
   - an Edge Function `send-email` for Supabase's Send Email hook that verifies the hook
     signature before sending
+
+**Supabase project settings (as set by the owner)**
+
+- "Automatically expose new tables" is off: new tables in `public` get no `select`,
+  `insert`, `update` or `delete` grants for `anon`, `authenticated` or `service_role`,
+  so the Data API cannot reach a table until it is granted explicitly. A missing grant
+  shows up as error `42501`.
+- "Enable automatic RLS" is on: an event trigger enables row-level security on every
+  new table in `public`. A table with RLS and no policies returns no rows.
+- So the `notes` migration must carry everything itself: `enable row level security`
+  stated anyway (do not depend on the trigger), `grant select, insert, delete` to
+  `authenticated` only (nothing to `anon`; no update, because the app never edits a
+  note), and per-user policies on `auth.uid()`.
+- Re-check the current Supabase docs for both settings before writing the migration
+  (checked 2026-11-15: "Securing your API" and "Event triggers" guides).
 
 **Where values live**
 
