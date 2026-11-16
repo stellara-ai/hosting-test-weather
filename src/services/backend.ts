@@ -84,7 +84,15 @@ export const backend: Backend = {
 
   async requestCode(email) {
     const { error } = await getClient().auth.signInWithOtp({ email })
-    if (error) throw new BackendError(error.message)
+    if (!error) return
+    // A failure in the Send Email hook surfaces as a 5xx with Supabase's
+    // internal wording, which means nothing to the person signing in.
+    const emailFailed = typeof error.status === 'number' && error.status >= 500
+    throw new BackendError(
+      emailFailed
+        ? 'We could not send the sign-in email. Please try again in a moment.'
+        : error.message,
+    )
   },
 
   async verifyCode(email, code) {

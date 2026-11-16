@@ -7,6 +7,11 @@
   portal, before that product is built.
 - Lessons from this test are recorded in the product repository
   (`stellara-ai/distributor-order-portal`, under `docs/`), not here.
+- One exception: `docs/stack-notes.md` in this repository collects what has been proven
+  about the whole pattern (Votel hosting, Supabase backend, sign-in email, access
+  control). It is the source for a reusable skill that will later move to
+  `stellara-ai/stellara-skills`. Update it in place whenever a check passes or fails or
+  a guess is settled.
 
 ## What is being tested
 
@@ -16,8 +21,8 @@
 - **Stage two, platform:** Supabase sign-in by emailed code, an Edge Function that reads
   a secret without exposing it, a table protected by row-level security, and sign-in
   email sent through Votel using Supabase's Send Email hook.
-- **Current state: stage one is implemented and passed. Stage two code is written but
-  not deployed, and none of its checks have been run.** Stage one is a weather lookup
+- **Current state: stage one is implemented and passed. Stage two is built and deployed
+  to Supabase, and six of its ten checks have passed (see below).** Stage one is a weather lookup
   (Open-Meteo, no API key) with routes `/`, `/saved`, `/city/:name` and a not-found
   page. Stage two adds `/sign-in`, a guarded `/account`, `src/services/backend.ts`
   (the only file that talks to Supabase) and the `supabase/` folder (one migration,
@@ -74,8 +79,10 @@ Votel Web App at `weather-test.stellarasystems.com`:
 
 ## Stage two plan
 
-**Status: code written, not deployed, no checks run.** Nothing has been applied to the
-Supabase project: no migration pushed, no function deployed, no secret or hook set.
+**Status: built and deployed; six of ten checks passed as of 2026-11-16.** The `notes`
+migration is applied, `secret-check` and `send-email` are deployed, the Send Email hook
+is enabled and the secrets are set. The stage two app has only been run on the local dev
+server, not yet published to Votel.
 
 **Goal:** prove Supabase login, secrets, data security and sign-in email, on top of the
 stage one app, using a free Supabase project.
@@ -89,8 +96,8 @@ stage one app, using a free Supabase project.
 - A `notes` table with row-level security so each user sees only their own rows.
 - Sign-in email through Votel:
   - an `EmailSender` interface so the provider can be swapped in one file
-  - a Votel adapter calling `POST {VOTEL_API_HOST}/api/emails/send` with an `X-API-Key`
-    header and a body of `template_key`, `recipient.email` and `variables.code`
+  - a Votel adapter calling `POST {VOTEL_API_HOST}/api/emails/test` with an `X-API-Key`
+    header and the whole email as raw content (see `docs/stack-notes.md` for why)
   - an Edge Function `send-email` for Supabase's Send Email hook that verifies the hook
     signature before sending
 
@@ -114,21 +121,21 @@ stage one app, using a free Supabase project.
 - Browser-safe, as public build-time variables: `VITE_SUPABASE_URL`,
   `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - Supabase secrets only, never in the repository or the Vue app: `TEST_SECRET`,
-  `VOTEL_API_HOST`, `VOTEL_API_KEY`, `VOTEL_OTP_TEMPLATE_KEY`, `SEND_EMAIL_HOOK_SECRET`.
+  `VOTEL_API_HOST`, `VOTEL_API_KEY`, `VOTEL_FROM_EMAIL`, `VOTEL_FROM_NAME`, `SEND_EMAIL_HOOK_SECRET`.
 - Never log a sign-in code or any secret value.
 
 **Stage two checks**
 
-- [ ] Sign in, refresh, still signed in; sign out works
-- [ ] `secret-check` returns found when signed in, and is refused when signed out
+- [x] Sign in, refresh, still signed in; sign out works (owner, local dev server, 2026-11-16)
+- [x] `secret-check` returns found when signed in, and is refused when signed out (2026-11-16)
 - [ ] A second user cannot see the first user's notes
-- [ ] The `TEST_SECRET` value appears nowhere in the build output
-- [ ] A code arrives at an address that is not a Supabase team member
+- [x] The `TEST_SECRET` value appears nowhere in the build output (2026-11-16)
+- [x] A code arrives at an address that is not a Supabase team member (2026-11-15)
 - [ ] Arrival time measured on five attempts
 - [ ] A code arrives at an address that is not a Votel contact
 - [ ] A code arrives for a Votel contact who unsubscribed from marketing email
 - [ ] A wrong Votel API key gives a clear failure, logged without secrets
-- [ ] A request to `send-email` without a valid hook signature is rejected
+- [x] A request to `send-email` without a valid hook signature is rejected (2026-11-15)
 
 **Known facts to respect**
 

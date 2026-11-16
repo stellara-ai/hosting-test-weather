@@ -5,7 +5,8 @@ import { createEmailSender, createVotelEmailSender, EmailSendError } from '../em
 const config = {
   apiHost: 'https://api.votel.test',
   apiKey: 'sk_test_key',
-  templateKey: 'otp-template',
+  fromEmail: 'support@example.com',
+  fromName: 'Example App',
 }
 
 describe('Votel email sender', () => {
@@ -20,20 +21,24 @@ describe('Votel email sender', () => {
     vi.unstubAllGlobals()
   })
 
-  it('posts the template key, recipient and code with the API key header', async () => {
+  it('posts the recipient, sender and an email containing the code, with the API key header', async () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
 
     await createVotelEmailSender(config).sendSignInCode('user@example.com', '123456')
 
     const [url, init] = fetchMock.mock.calls[0] ?? []
-    expect(String(url)).toBe('https://api.votel.test/api/emails/send')
+    expect(String(url)).toBe('https://api.votel.test/api/emails/test')
     expect(init?.method).toBe('POST')
     expect(new Headers(init?.headers).get('X-API-Key')).toBe('sk_test_key')
-    expect(JSON.parse(String(init?.body))).toEqual({
-      template_key: 'otp-template',
-      recipient: { email: 'user@example.com' },
-      variables: { code: '123456' },
+    const body = JSON.parse(String(init?.body))
+    expect(body).toMatchObject({
+      recipient_emails: 'user@example.com',
+      subject: 'Your sign-in code',
+      is_marketing: false,
+      from_email: 'support@example.com',
+      from_name: 'Example App',
     })
+    expect(body.content).toContain('123456')
   })
 
   it('reports a refused API key clearly, without leaking the key, code or recipient', async () => {

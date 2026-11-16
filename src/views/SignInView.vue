@@ -52,7 +52,7 @@ const buttonClass =
         required
         inputmode="numeric"
         autocomplete="one-time-code"
-        placeholder="6-digit code"
+        placeholder="Code from the email"
         :class="inputClass"
       />
       <button type="submit" :disabled="pending" :class="buttonClass">
