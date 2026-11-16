@@ -18,11 +18,15 @@
 - **Stage one, hosting:** a Vue app served as static files on Votel, on a custom
   subdomain, with history-mode deep links, a public build-time variable, and a second
   subdomain on the same app.
+- **Stage three, core workflow (not started):** the same app published on Votel, tenant
+  isolation with invite-only access, tenant branding, and one document flow for a single
+  client (LAMO Distributor): order to invoice to delivery confirmation with a signature,
+  to PDF. See "Stage three plan".
 - **Stage two, platform:** Supabase sign-in by emailed code, an Edge Function that reads
   a secret without exposing it, a table protected by row-level security, and sign-in
   email sent through Votel using Supabase's Send Email hook.
 - **Current state: stage one is implemented and passed. Stage two is built and deployed
-  to Supabase, and eight of its ten checks have passed (see below).** Stage one is a weather lookup
+  to Supabase, and nine of its ten checks have passed (see below).** Stage one is a weather lookup
   (Open-Meteo, no API key) with routes `/`, `/saved`, `/city/:name` and a not-found
   page. Stage two adds `/sign-in`, a guarded `/account`, `src/services/backend.ts`
   (the only file that talks to Supabase) and the `supabase/` folder (one migration,
@@ -79,7 +83,7 @@ Votel Web App at `weather-test.stellarasystems.com`:
 
 ## Stage two plan
 
-**Status: built and deployed; eight of ten checks passed as of 2026-11-16.** The `notes`
+**Status: built and deployed; nine of ten checks passed as of 2026-11-16.** The `notes`
 migration is applied, `secret-check` and `send-email` are deployed, the Send Email hook
 is enabled and the secrets are set. The stage two app has only been run on the local dev
 server, not yet published to Votel.
@@ -131,14 +135,106 @@ stage one app, using a free Supabase project.
 - [x] A second user cannot see the first user's notes (owner, second account saw no notes, 2026-11-16)
 - [x] The `TEST_SECRET` value appears nowhere in the build output (2026-11-16)
 - [x] A code arrives at an address that is not a Supabase team member (2026-11-15)
-- [ ] Arrival time measured on five attempts
+- [x] Arrival time measured on five attempts (owner-reported pass, 2026-11-16; timings not recorded here)
 - [x] A code arrives at an address that is not a Votel contact (2026-11-16)
-- [ ] A code arrives for a Votel contact who unsubscribed from marketing email
+- [x] A code arrives for a Votel contact who unsubscribed from marketing email (2026-11-16)
 - [ ] A wrong Votel API key gives a clear failure, logged without secrets
 - [x] A request to `send-email` without a valid hook signature is rejected (2026-11-15)
+
+**Open items**
+
+- Votel support: emailed by the owner on 2026-11-15, no answer yet. Questions: why
+  template variables do not render on `/api/emails/send`; whether `/api/emails/test` is
+  supported for production; where delivery status for those sends can be seen; whether
+  open tracking can be turned off; whether a send-only key role exists.
+- The wrong-API-key check has not been run.
+- Stage two is not yet published to Votel. `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_PUBLISHABLE_KEY` were added to the Web App as Public variables on
+  2026-11-16; pulling the stage two code, rebuilding and publishing is still to do.
+- Decide between Votel's test endpoint and a transactional provider (Resend) for the
+  product's sign-in email once Votel support answers.
 
 **Known facts to respect**
 
 - Supabase's built-in email only delivers to the organization's team members, so custom
   sending is required for real users.
 - Do not change the Supabase project without my confirmation.
+
+## Stage three plan
+
+**Status: not started.** Agreed with the owner on 2026-11-16. This is still a proof of
+concept: each part exists to prove a mechanism the product depends on, in its simplest
+form, for one client (LAMO Distributor). It is not the product's invoicing module.
+
+**Goal:** prove that the stack can carry the product's core workflow: several tenants
+kept apart, only invited people getting in, and an order becoming an invoice, a delivery
+confirmation with a signature, and a PDF.
+
+**Part A: published on Votel**
+
+- Pull the stage two and three code into the Votel Web App, rebuild and publish.
+  `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are already set there as Public.
+- Repeat the sign-in, secret-check and notes checks on `weather-test.stellarasystems.com`
+  and on the second subdomain.
+
+**Part B: tenants, invitations and branding**
+
+- A `tenants` table and a `memberships` table (user, tenant, role). Every tenant-owned
+  table carries a tenant id, and its row-level security is written against membership.
+- Invite-only: sign-ups off in Supabase, codes requested with `shouldCreateUser: false`,
+  users created by invitation. The sign-in form answers the same way for any address.
+- Branding per tenant, kept deliberately small: a logo or word mark (an image in Supabase
+  Storage), a primary colour and an accent colour for buttons and links. Applied through
+  CSS variables. No themes, fonts or layout options.
+
+**Part C: one document flow**
+
+- Seeded orders with line items for LAMO. No order-entry screen.
+- An invoice is created from an order and filled in automatically, then can be edited by
+  hand on the web page (quantities, prices, a note) before it is finalised. One layout.
+- Delivery confirmation on a phone: a checklist with one line per item on the delivery,
+  each ticked as received, then the customer signs on the screen. The signature image is
+  saved to Supabase Storage under access rules.
+- An Edge Function generates a PDF of the invoice with the tenant's logo, the line items
+  and the signature, stores it, and returns a short-lived link to download it.
+
+**Part D: printing (a separate trial, not built into this app unless agreed)**
+
+- Requirement from the owner: print from the web app to a local printer automatically,
+  two copies.
+- Facts from the owner (2026-11-16): an ordinary office laser or inkjet printer,
+  letter-size invoices; a computer beside it stays on; the two copies are one for the
+  business and one for the client, so the PDF is produced as two labelled copies
+  ("Business copy", "Client copy").
+- LAMO's logo and brand colours are not in hand yet; the owner will supply them. Until
+  then the test tenant uses a placeholder word mark and two placeholder colours.
+- Planned approach: server-triggered printing through a cloud print service with an
+  agent on a computer beside the printer, behind a `PrintProvider` interface, fed from a
+  `print_jobs` queue table. To be tried with the real printer before it is designed in.
+
+**Out of scope for stage three**
+
+- More than one invoice layout, taxes and payments, QuickBooks, the Votel contact sync,
+  order entry, speech-to-text, passkeys.
+
+**Stage three checks**
+
+- [ ] The published app signs a user in on both subdomains
+- [ ] `secret-check` and notes work from the published app
+- [ ] A user in tenant A cannot read or change tenant B's orders, invoices or files
+- [ ] A user with no membership sees nothing
+- [ ] An address that was never invited gets no account and no code
+- [ ] The sign-in form gives the same answer for invited and uninvited addresses
+- [ ] A tenant's logo and two colours appear in the app and on the PDF
+- [ ] An invoice is filled in from an order, edited by hand, and the edit is kept
+- [ ] A delivery is confirmed item by item and signed on a phone
+- [ ] The signature file cannot be read by another tenant or when signed out
+- [ ] The PDF is generated by an Edge Function within its limits and downloads correctly
+- [ ] A finalised invoice cannot be edited
+
+**Dependencies stage three will need (ask before adding each)**
+
+- A pure-JavaScript PDF library for the Edge Function. Edge Functions do not support
+  libraries that need native code or multithreading.
+- Possibly none for the signature pad; it can be written against the browser canvas.
+

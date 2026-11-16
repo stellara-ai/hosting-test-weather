@@ -6,7 +6,7 @@ once the test app is hardened; until then this file is updated in place as thing
 proven or disproven.
 
 Last updated: 2026-11-16. Stage one (hosting) is complete. Stage two (sign-in, secrets,
-data security, email) is built and deployed; eight of its ten checks have passed.
+data security, email) is built and deployed; nine of its ten checks have passed. The wrong-API-key check is the one not yet run.
 
 ## How to read the status labels
 
@@ -167,7 +167,7 @@ function URL, generate the secret, and store that secret as `SEND_EMAIL_HOOK_SEC
 | An API send reaches a Gmail inbox quickly | Proven once | Arrived within the same minute; the five-attempt timing has not been run |
 | **Caller-supplied `variables` do not reach the template** | Proven | See "The variables finding" below. This blocks Votel for sign-in codes |
 | Sender is set per template by `from_name` and `from_email` | Proven by reading the record | Both default to `{{system.app_name}}` and `{{system.support_email}}`, which gave "Stellara Legal" at `support@stellaralegal.com`. Changing them needs `PUT /api/email-templates/{id}`; neither the visual editor nor the MCP tool exposes them |
-| Delivery to an unsubscribed contact, and to a non-contact | Open | Stage two checks |
+| Delivery to an unsubscribed contact, and to a non-contact | Proven | Both received the code through the raw-content route, 2026-11-16 |
 | Time from request to inbox | Open | Stage two check |
 
 ### The variables finding (2026-11-15)
@@ -330,9 +330,9 @@ Stage two:
 | A second user cannot see the first user's notes | Pass (a second account's Account page showed no notes; owner-reported. A signed-out read is refused with `42501`) |
 | The `TEST_SECRET` value appears nowhere in the build output | Pass (secret set to a fresh 40-character value, app rebuilt, zero matches in `dist` and in the repository; the same search does find the publishable key, so the search works) |
 | A code arrives at an address that is not a Supabase team member | Pass (a Gmail address outside the Supabase organization) |
-| Arrival time measured on five attempts | Not run |
+| Arrival time measured on five attempts | Pass (owner-reported; individual timings not recorded. One measured send took one second from creation to the receiving server) |
 | A code arrives at an address that is not a Votel contact | Pass (owner confirmed the address is not in Votel's contacts) |
-| A code arrives for a Votel contact who unsubscribed from marketing email | Not run |
+| A code arrives for a Votel contact who unsubscribed from marketing email | Pass (contact marked unsubscribed from marketing still received the code, so `is_marketing: false` sends are not suppressed) |
 | A wrong Votel API key gives a clear failure, logged without secrets | Not run (a valid Viewer key gave a clean 403 log line, which is related but not this check) |
 
 ## What the future skill should cover
