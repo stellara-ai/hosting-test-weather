@@ -33,8 +33,13 @@ vue-tsc `^3.3.11`, vitest `^4.1.11`, eslint `^10.10.0`. Node `^22.18.0 || >=24.1
 | --- | --- | --- | --- | --- | --- |
 | `npm install` | `npm run dev` | `npm test` | `npm run lint` | `npm run type-check` | `npm run build` |
 
+- Votel is used for hosting only. The entire app is written, tested and built from this
+  repository; Votel's assistant does not write or change app code.
 - Only the build output in `dist` is deployed. Source stays in GitHub. Code flows one
   way, from GitHub to the host.
+- Publishing to Votel is a manual step by the owner. Stage one was published by Votel's
+  Web App import (clone, build, publish). Uploading an already-built `dist` to a Votel
+  Website is documented but has not been run.
 - Values with a `VITE_` prefix are public and fixed at build time. On Votel they are set
   as "Public" environment variables, never "Secret". The only one today is
   `VITE_APP_LABEL`, shown in the footer.
@@ -52,14 +57,15 @@ vue-tsc `^3.3.11`, vitest `^4.1.11`, eslint `^10.10.0`. Node `^22.18.0 || >=24.1
 
 ## Results so far
 
-Stage one hosting checks:
+Stage one hosting checks. All six passed, as reported by the owner on 2026-11-15, on the
+Votel Web App at `weather-test.stellarasystems.com`:
 
-- [ ] The home page loads on a phone
-- [ ] Opening `/city/miami` directly works
-- [ ] Refreshing `/city/miami` works
-- [ ] `VITE_APP_LABEL` shows in the footer
-- [ ] A custom subdomain works over HTTPS
-- [ ] A second subdomain pointing at the same site works
+- [x] The home page loads on a phone
+- [x] Opening `/city/miami` directly works
+- [x] Refreshing `/city/miami` works
+- [x] `VITE_APP_LABEL` shows in the footer
+- [x] A custom subdomain works over HTTPS
+- [x] A second subdomain pointing at the same site works
 
 ## Stage two plan
 
