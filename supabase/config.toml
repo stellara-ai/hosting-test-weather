@@ -8,6 +8,11 @@ project_id = "hosting-test-weather"
 [functions.secret-check]
 verify_jwt = true
 
+# Called by signed-in users from the app. The function also checks the token
+# itself and reads everything under the caller's own row-level security.
+[functions.order-pdf]
+verify_jwt = true
+
 # Called by Supabase Auth's Send Email hook, which sends no user JWT.
 # The function verifies the hook signature itself.
 [functions.send-email]

@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 
 import NotesPanel from '@/components/NotesPanel.vue'
+import OrdersPanel from '@/components/OrdersPanel.vue'
 import SecretCheckPanel from '@/components/SecretCheckPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
@@ -43,6 +44,7 @@ async function signOut() {
         Sign out
       </button>
     </div>
+    <OrdersPanel v-if="tenant.tenant" />
     <SecretCheckPanel />
     <NotesPanel />
   </section>

@@ -34,6 +34,21 @@ export interface Tenant {
   logoUrl: string | null
 }
 
+export interface OrderSummary {
+  id: string
+  number: string
+  customerName: string
+  orderedOn: string
+  totalCents: number
+  signed: boolean
+}
+
+export interface OrderPdfLink {
+  url: string
+  /** What the server measured while building the PDF, for the spike's records. */
+  measurements: { bytes: number; buildMs: number; totalMs: number; heapMb: number }
+}
+
 export interface Backend {
   /** The signed-in user restored from the stored session, or null. */
   getUser(): Promise<AuthUser | null>
@@ -48,6 +63,10 @@ export interface Backend {
   checkSecret(): Promise<SecretCheck>
   /** The business the signed-in user belongs to, or null when they belong to none. */
   getTenant(): Promise<Tenant | null>
+  /** The orders of the signed-in user's business, newest first. */
+  listOrders(): Promise<OrderSummary[]>
+  /** Builds the invoice PDF for an order and returns a short-lived download link. */
+  getOrderPdfLink(orderId: string): Promise<OrderPdfLink>
 }
 
 export class BackendError extends Error {
@@ -77,6 +96,29 @@ interface MembershipRow {
     primary_color: string
     accent_color: string
   } | null
+}
+
+const ORDER_COLUMNS =
+  'id, number, customer_name, ordered_on, signature_path, order_lines (quantity, unit_price_cents)'
+
+interface OrderRow {
+  id: string
+  number: string
+  customer_name: string
+  ordered_on: string
+  signature_path: string | null
+  order_lines: { quantity: number; unit_price_cents: number }[]
+}
+
+export function toOrderSummary(row: OrderRow): OrderSummary {
+  return {
+    id: row.id,
+    number: row.number,
+    customerName: row.customer_name,
+    orderedOn: row.ordered_on,
+    totalCents: row.order_lines.reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0),
+    signed: row.signature_path !== null,
+  }
 }
 
 /**
@@ -214,5 +256,24 @@ export const backend: Backend = {
       accentColor: row.tenants.accent_color,
       logoUrl,
     }
+  },
+
+  async listOrders() {
+    // Row-level security returns only the orders of the caller's businesses.
+    const { data, error } = await getClient()
+      .from('orders')
+      .select(ORDER_COLUMNS)
+      .order('ordered_on', { ascending: false })
+      .order('number', { ascending: false })
+    if (error) throw new BackendError(error.message)
+    return (data as unknown as OrderRow[]).map(toOrderSummary)
+  },
+
+  async getOrderPdfLink(orderId) {
+    const { data, error } = await getClient().functions.invoke<OrderPdfLink>('order-pdf', {
+      body: { orderId },
+    })
+    if (error || !data?.url) throw new BackendError('The invoice PDF could not be created.')
+    return { url: data.url, measurements: data.measurements }
   },
 }

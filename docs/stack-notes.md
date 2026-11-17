@@ -129,6 +129,15 @@ Gotchas found:
   auth and CORS. The test app does not use it, to avoid a dependency. Open: adopt it for
   the product.
 - Functions that read a secret return facts about it (`found`, `length`), never the value.
+- **An `npm:` import can work in Node and still fail to boot on the Edge Runtime (Proven,
+  2026-11-17).** `npm:@pdfme/pdf-lib@6.2.8` failed with "worker boot error: ... does not
+  provide an export named 'FontNames'": its dependency `@pdf-lib/standard-fonts` is
+  CommonJS that re-exports through a helper the runtime does not follow. Loading the same
+  version from `https://esm.sh/@pdfme/pdf-lib@6.2.8?target=denonext` fixed it. Deploying
+  with `--use-api` does not type-check or boot the function, so call it once after every
+  deploy and read the function logs; a `BOOT_ERROR` (503) shows up only then.
+- Edge Function limits on the hosted platform (checked 2026-11-17): 256 MB memory, 2 s of
+  CPU per request, 150 s wall clock on the free plan (400 s paid), 20 MB bundle.
 
 ### Email settings on the free plan (Proven)
 
@@ -365,7 +374,9 @@ Facts learned from the publish:
   regenerate with `npx npm@10 install --package-lock-only`; the result passes `npm ci`
   on both versions. Rule: after any dependency change, run
   `npx npm@10 ci --dry-run --ignore-scripts` before pushing, and in a host prompt tell
-  the assistant to stop if `npm ci` fails.
+  the assistant to stop if `npm ci` fails. After the fix, Votel's assistant reported
+  `npm ci` passing on commit `7cd74a4` (assistant-reported; the bundle name it gave
+  matches the one fetched from both subdomains).
 
 ## Tenants, invite-only sign-in and branding (stage three, Part B)
 

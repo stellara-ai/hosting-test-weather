@@ -25,12 +25,13 @@
 - **Stage one, hosting:** a Vue app served as static files on Votel, on a custom
   subdomain, with history-mode deep links, a public build-time variable, and a second
   subdomain on the same app.
-- **Stage three, core workflow (Parts A and B passed; Parts C to E not started):** the same app published on Votel, tenant
-  isolation with invite-only access, tenant branding, and one document flow for a single
-  client (LAMO Distributor): order to invoice to delivery confirmation with a signature,
-  to PDF. See "Stage three plan". Stage three also proves the AI-first plumbing for the
-  LAMO app (a typed and spoken assistant over the weather features, not started). See
-  "AI-first (stage three)".
+- **Stage three, core workflow (Parts A and B passed; narrowed on 2026-11-17, remaining
+  parts not started):** the same app published on Votel, tenant isolation with
+  invite-only access and tenant branding (all passed). What remains are two small spikes
+  that could still change the stack: a PDF made by an Edge Function, and an MCP server
+  that outside AI agents sign in to as a tenant user. The invoice flow, signature and
+  in-app AI assistant move to the product. Printing stays a separate trial. See "Stage
+  three plan".
 - **Stage two, platform:** Supabase sign-in by emailed code, an Edge Function that reads
   a secret without exposing it, a table protected by row-level security, and sign-in
   email sent through Votel using Supabase's Send Email hook.
@@ -184,15 +185,32 @@ stage one app, using a free Supabase project.
 
 **Status: Part A passed on 2026-11-16. Part B was built, applied to Supabase and
 passed on 2026-11-16 on the local dev server (tenants migration, placeholder logos,
-sign-ups off, two memberships); it is not yet published to Votel. Parts C, D and E not
-started.** Agreed with the
-owner on 2026-11-16. This is still a proof of
-concept: each part exists to prove a mechanism the product depends on, in its simplest
-form, for one client (LAMO Distributor). It is not the product's invoicing module.
+sign-ups off, two memberships). It was published to Votel the same day from commit
+`7cd74a4` (reported by Votel's assistant, with `npm ci` passing); both subdomains serve
+that build, and the owner signed in on the published site as the LAMO admin and saw the
+LAMO logo and colours. Narrowed on 2026-11-17 (owner): Part C is reduced to a PDF
+spike, Part F (MCP spike) is added, and the in-app assistant (Part E) moves to the
+product. Part C built locally on 2026-11-17, not yet applied (see "Part C: PDF spike");
+Part F not started; Part D (printing) is a separate trial.** Agreed with
+the owner on 2026-11-16. This is still a proof of concept: each part exists to prove a
+mechanism the product depends on, in its simplest form, for one client (LAMO
+Distributor). It is not the product's invoicing module.
 
 **Goal:** prove that the stack can carry the product's core workflow: several tenants
-kept apart, only invited people getting in, and an order becoming an invoice, a delivery
-confirmation with a signature, and a PDF.
+kept apart, only invited people getting in, a document produced as a PDF on the server,
+and outside AI agents working as a signed-in tenant user.
+
+**Why narrowed (2026-11-17):** only work that could still change the stack stays here.
+The invoice editing, delivery checklist, signature capture and finalising use the same
+table, access-rule and Storage patterns already proven in Parts A and B, so they are
+built in the product instead of twice. The in-app assistant reuses the stage two
+mechanism (an Edge Function calling an outside service with a secret), so it also moves
+to the product. Two things are unproven and would force a different design if they
+fail: PDF generation inside an Edge Function, and per-user sign-in for an MCP server on
+Supabase (Supabase's guide to MCP servers on Edge Functions covers only servers without
+sign-in as of 2026-11-17; Supabase Auth's OAuth 2.1 server is the documented route, with
+an approval page the app must build). When both spikes are done, this test stops and the
+product starts.
 
 **Part A: published on Votel**
 
@@ -217,16 +235,111 @@ confirmation with a signature, and a PDF.
   membership. "Inviting" in this test means adding the user and a membership row by hand;
   an invitation screen and function are carried to the product.
 
-**Part C: one document flow**
+**Shared seed data for Parts C and F**
 
-- Seeded orders with line items for LAMO. No order-entry screen.
-- An invoice is created from an order and filled in automatically, then can be edited by
-  hand on the web page (quantities, prices, a note) before it is finalised. One layout.
-- Delivery confirmation on a phone: a checklist with one line per item on the delivery,
-  each ticked as received, then the customer signs on the screen. The signature image is
-  saved to Supabase Storage under access rules.
-- An Edge Function generates a PDF of the invoice with the tenant's logo, the line items
-  and the signature, stores it, and returns a short-lived link to download it.
+- An `orders` table and an `order_lines` table, each with a tenant id and row-level
+  security against membership, read-only to the app. A few seeded orders for LAMO and one
+  for Tenant B. No order-entry screen.
+
+**Part C: PDF spike**
+
+- An Edge Function, signed-in callers only, builds a PDF of one seeded order: the
+  tenant's logo from `tenant-assets`, the line items and totals, and a sample signature
+  image stored in Storage (no signature pad; that is built in the product).
+- The PDF has two labelled copies, "Business copy" and "Client copy", so the same file
+  serves the printing trial.
+- It is stored in a private bucket under the tenant's folder and returned as a
+  short-lived download link.
+- Record the function's time and memory use against Supabase's Edge Function limits.
+- **As built and applied (2026-11-17):** migration
+  `20261117230000_create_orders.sql` (orders, order lines, three seeded orders, the
+  private `tenant-documents` bucket, LAMO's word mark and brand colours), Edge Function
+  `order-pdf` with its layout in `_shared/invoicePdf.ts` (`@pdfme/pdf-lib`), and an Orders
+  list with an "Invoice PDF" button on `/account`. Type check, lint and tests pass; a local
+  preview built both copies in about 0.14 s, 264 KB. With the owner's go-ahead the word
+  mark, sample signature and Tenant B's PNG logo were uploaded to `tenant-assets`, the
+  migration was pushed and `order-pdf` deployed. The library is loaded from esm.sh, not
+  `npm:` (see `docs/stack-notes.md`). Next: the owner tests as the LAMO admin and the
+  Tenant B member on the local dev server.
+- Approved dependencies (owner, 2026-11-17): `@pdfme/pdf-lib` for this spike;
+  `@modelcontextprotocol/sdk` and `zod` for Part F.
+- **Layout follows LAMO's sample invoices (owner, 2026-11-17; samples in
+  `sampleinvoices/`, never committed).** Business logo, name, address, email and phone at
+  the top left; "Invoice" with Date, Ship Date and Invoice # at the top right; Bill To and
+  Ship To boxes, each with name and address; a table of Quantity, Item Code, Description,
+  Price Each and Amount; the Total in a box at the bottom, beside the delivery signature.
+  31 lines per page; longer invoices continue onto further pages, each repeating the
+  header and the Bill To and Ship To boxes, with "Continued on next page" at the foot of
+  every page but the last, which carries the Total and signature. Capped at 10 pages per
+  copy (more is refused with a clear message). Helvetica 9 pt. Migration `20261117240000_invoice_fields.sql` adds the fields.
+  LAMO's real contact details are applied from `brand-assets/lamo/contact.sql`
+  (git-ignored), never committed. The samples' P.O. Number, Terms, Rep, Via, F.O.B. and
+  Project row is left out until the owner asks for it.
+- **Invoice settings per business (owner, 2026-11-17).** `tenants.invoice_settings` (JSON,
+  migration `20261117250000_invoice_settings.sql`, read by `readInvoiceOptions` in
+  `invoicePdf.ts`). Anything missing or invalid takes the default, which matches the
+  samples:
+  - on/off: `showName`, `showAddress`, `showEmail`, `showPhone`, `showDate`,
+    `showShipDate`, `showCopyLabels`, `showPageNumbers` ("Page 1 of 2", per copy);
+  - `columns`: left to right from `quantity`, `itemCode`, `description`, `unit`,
+    `priceEach`, `amount` (Description always included, and takes the remaining width);
+  - `tableLines`: `columns` (as on the samples), `grid` (also between rows) or `none`;
+  - `colorMode`: `color` or `blackAndWhite` (black text, light grey table header, outlined
+    copy tag; the logo and signature images keep their own colours).
+  Switched-off lines take no space, and the date box narrows. Both copies are still
+  produced when the tags are off. The invoice number, Bill To, Ship To and the total
+  always print. No settings screen in this test; change by SQL, for example
+  `update tenants set invoice_settings = '{"showName": false, "tableLines": "grid"}' where slug = 'lamo'`.
+
+**Invoice requirements for the product (owner, 2026-11-17; documented, not built here)**
+
+Each business sets up its own invoice; nothing below is fixed in code:
+
+- **Columns:** choose which appear and in what order (for example Item Code, Price Each,
+  Unit), with their headings.
+- **Line item font size** (not built here), and a grey version of the logo for
+  black-and-white invoices.
+- **Totals block:** optional Subtotal, Discount (amount or percentage), Tax (rate), and
+  Shipping charge, each turned on or off per business; Total always shown.
+- **Header fields:** optional P.O. Number, Terms, Rep, Via, F.O.B., Project, as on LAMO's
+  current invoices.
+- **Manual entry and override.** A person can open any invoice, including one the AI
+  drafted, and add, change or remove line items by hand before it is finalised. This is
+  the same rule as "AI proposes, code commits": the AI fills in a draft, a person can
+  always correct it, and the draft becomes final only when a person confirms.
+- **Preview before finalising.** The preview must be exactly what prints. Recommended:
+  draw it with the same layout code that makes the PDF (`invoicePdf.ts`). The library
+  also runs in the browser, so the preview can redraw instantly as lines are edited, with
+  no server call, and the server still produces the stored PDF from the saved data.
+- **Layouts are data, not code, and belong to a tenant and its customers (owner,
+  2026-11-17).** One layout engine serves every tenant; nothing about a tenant's invoice
+  is written into code. Proposed model:
+  - a tenant can save several named layouts (settings like `invoice_settings`);
+  - one of them is the tenant's default;
+  - a customer can be given its own layout, overriding the default for that customer
+    only, for example a hospital that wants item codes and a grid;
+  - which layout prints: the customer's own layout if it has one, otherwise the tenant's
+    default, otherwise the built-in defaults;
+  - **"Apply to all customers"**: one action sets a layout as the tenant's default and
+    removes every customer override, so all customers print the same way. It asks for
+    confirmation first and says how many customers will change.
+  - Needs a `customers` table (the test stores the customer as text on each order), and
+    each invoice records which layout printed it so a reprint matches the original.
+- The invoice settings are changed only by an admin of that business, on a settings
+  screen with a live preview. The test's `tenants.invoice_settings` is the starting
+  point: it plays the role of the tenant's default layout.
+
+**Part F: MCP spike**
+
+- One MCP server as an Edge Function, with one read-only tool: list my tenant's orders.
+- Outside AI apps sign in as an existing user through Supabase Auth's OAuth 2.1 server,
+  with a minimal approval page in the Vue app. The tool runs as that user, so the
+  existing row-level security decides what they see.
+- The tool is declared once in a tool catalog (see "MCP server and tool catalog"), and
+  the MCP tool list is generated from it.
+- Enabling the OAuth 2.1 server is a Supabase project change: confirm with the owner
+  first. Fetch current Supabase and MCP docs before writing code.
+- Write tools, confirmations over MCP and the in-app assistant are built in the product.
 
 **Part D: printing (a separate trial, not built into this app unless agreed)**
 
@@ -236,8 +349,12 @@ confirmation with a signature, and a PDF.
   letter-size invoices; a computer beside it stays on; the two copies are one for the
   business and one for the client, so the PDF is produced as two labelled copies
   ("Business copy", "Client copy").
-- LAMO's logo and brand colours are not in hand yet; the owner will supply them. Until
-  then the test tenant uses a placeholder word mark and two placeholder colours.
+- LAMO's brand assets are in `brand-assets/lamo/` (local only, not committed): light- and
+  dark-mode word marks and logos as PNG, and a brand board with the colours. Always take
+  LAMO's logo and colours from there, never make a placeholder (owner, 2026-11-17). The
+  light-mode word mark is used on white (the PDF and the app, which has no dark mode);
+  primary Warm Brown `#521F12`, accent Leaf Green `#527A38`. Open question for the
+  owner: the light word mark reads "LAMO", the dark one and the brand board "Lamo".
 - Planned approach: server-triggered printing through a cloud print service with an
   agent on a computer beside the printer, behind a `PrintProvider` interface, fed from a
   `print_jobs` queue table. To be tried with the real printer before it is designed in.
@@ -245,36 +362,41 @@ confirmation with a signature, and a PDF.
 **Out of scope for stage three**
 
 - More than one invoice layout, taxes and payments, QuickBooks, the Votel contact sync,
-  order entry, passkeys. (Speech-to-text was out of scope until 2026-11-16; it is now
-  in, under "AI-first (stage three)".)
+  order entry, passkeys.
+- Moved to the product on 2026-11-17: invoice creation and hand editing, finalising,
+  the delivery checklist and signature pad, the in-app AI assistant (typed and spoken),
+  write tools over MCP.
 
 **Stage three checks**
 
 - [x] The published app signs a user in on both subdomains (owner, 2026-11-16)
 - [x] `secret-check` and notes work from the published app (owner, 2026-11-16)
-- [ ] A user in tenant A cannot read or change tenant B's orders, invoices or files (so far, 2026-11-16: each member sees only their own tenant's name, logo and colours; orders and invoices arrive in Part C)
+- [ ] A user in tenant A cannot read tenant B's orders or files (so far, 2026-11-16: each member sees only their own tenant's name, logo and colours; orders arrive with the shared seed data)
 - [x] A user with no membership sees nothing (owner, local dev server, 2026-11-16: default colours, no logo, "No business is linked to this account")
 - [x] An address that was never invited gets no account and no code (2026-11-16: refused with `otp_disabled`, and with `signup_disabled` when the request asks for an account; user count unchanged)
 - [x] The sign-in form gives the same answer for invited and uninvited addresses (2026-11-16, local dev server. Known limits carried to the product: reply timing, and the one-per-minute message appears only for real accounts)
-- [ ] A tenant's logo and two colours appear in the app and on the PDF (app: pass for both test tenants, owner, 2026-11-16; PDF waits for Part C)
-- [ ] An invoice is filled in from an order, edited by hand, and the edit is kept
-- [ ] A delivery is confirmed item by item and signed on a phone
-- [ ] The signature file cannot be read by another tenant or when signed out
-- [ ] The PDF is generated by an Edge Function within its limits and downloads correctly
-- [ ] A finalised invoice cannot be edited
+- [ ] A tenant's logo and two colours appear in the app and on the PDF (app: pass for both test tenants on the local dev server, and for LAMO on the published site, owner, 2026-11-16; PDF waits for Part C)
+- [ ] Part C: the PDF is generated by an Edge Function within its limits, has both labelled copies, and downloads correctly through a short-lived link
+- [ ] Part C: the stored PDF and signature image cannot be read by another tenant or when signed out
+- [ ] Part F: Claude connects to the MCP server and signs in as the LAMO admin through the approval page
+- [ ] Part F: the orders tool returns only LAMO's orders for the LAMO admin, only Tenant B's for the Tenant B member, and nothing for the user with no membership
+- [ ] Part F: a client that has not signed in is refused
+- [ ] Part F: the MCP tool list matches the tool catalog exactly
+- Not applicable here, moved to the product (2026-11-17): invoice filled from an order and edited by hand; delivery confirmed item by item and signed on a phone; finalised invoice cannot be edited.
 
 **Dependencies stage three will need (ask before adding each)**
 
 - A pure-JavaScript PDF library for the Edge Function. Edge Functions do not support
   libraries that need native code or multithreading.
-- Possibly none for the signature pad; it can be written against the browser canvas.
+- The MCP TypeScript SDK (or a lighter MCP framework) inside the MCP Edge Function only.
 
 ## AI-first (stage three)
 
-**Status: not started.** Added by the owner on 2026-11-16. This is Part E of stage three.
-It exists for the LAMO Distributor app that will be built after this test (the product
-in `stellara-ai/distributor-order-portal`): what is proven here is the AI plumbing that
-app depends on.
+**Status: moved to the product on 2026-11-17, except the MCP spike (Part F) and the tool
+catalog it needs.** Added by the owner on 2026-11-16 as Part E of stage three. The
+in-app assistant is no longer built here: its mechanism was proven in stage two, so it
+is built once, in the LAMO Distributor app (`stellara-ai/distributor-order-portal`).
+The rest of this section stays as the AI-first standard to carry into the product.
 
 This section is the standard for every AI feature in this proof of concept. The product this test serves is designed AI-first: AI is the main way work enters and moves through the system, and the screens are where people review it. AI must not be an afterthought or bolted on. Stage three exists to prove that plumbing here, on a harmless weather app, before it is built into the product.
 
@@ -310,6 +432,32 @@ more. Where it differs from the text below, this subsection wins.
   loudly. A model picker for users is a product decision, not built here.
 - **Not yet confirmed:** the OpenRouter account and key, the first model, and whether to
   add a validation library.
+
+### MCP server and tool catalog (owner, 2026-11-17)
+
+AI-first includes an MCP server: the app's tools must be callable by outside AI agents
+(Claude, ChatGPT and others), not only by the in-app assistant. In this test, only the
+read-only spike in Part F is built; the rest below is the standard for the product.
+
+- **One tool catalog, kept in code.** Every tool is declared once with: name,
+  description, input schema, output shape, read or write, whether it needs a human
+  confirmation, required role, and which channels expose it (screen, assistant, MCP).
+  The assistant's tool list, the MCP server's tool list and a generated reference doc
+  are all built from that catalog. No channel keeps its own hand-written list.
+- **MCP is another channel, not a second path.** MCP tools call the same use-case
+  functions as the screens and the assistant, as the signed-in user, inside that user's
+  tenant. An MCP client can never do more than that user can in the app.
+- **AI proposes, code commits, still applies.** A write tool called over MCP returns a
+  proposal; the change happens only after a confirmation the user can see. Read tools
+  need no confirmation.
+- **Open questions:** where the server runs (an Edge Function is the obvious candidate;
+  check current Supabase and MCP docs first), how outside clients sign in (MCP's OAuth
+  flow on top of Supabase Auth), and how a confirmation reaches the user when the caller
+  is an outside agent.
+- **Checks (when built):** the tool list matches the catalog exactly; an MCP client signed
+  in as a tenant A user cannot see or touch tenant B; a write over MCP changes nothing
+  until confirmed; a signed-out client is refused; every MCP call is logged like an
+  `ai_runs` row.
 
 ### North star
 

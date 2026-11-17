@@ -7,6 +7,11 @@ the invoice screen and PDF (Part C). One folder per tenant.
   600 pixels wide with a transparent background), plus the primary and accent colours as
   hex values in `lamo/colours.txt`.
 
+As supplied for LAMO (2026-11-17): light- and dark-mode word marks and logos as PNG, and
+`LamoBrandBoard.png` with the colours (no `colours.txt`). Copies resized to 1,000 pixels
+wide (`lamo-wordmark-*-1000.png`) are the ones uploaded, because the originals exceed the
+1 MB limit of the `tenant-assets` bucket.
+
 The files in the tenant folders are not committed: this repository is public and the
 assets belong to the client. The app does not read them from here. At build-out they are
 uploaded to Supabase Storage and the colours are saved on the tenant's row.
