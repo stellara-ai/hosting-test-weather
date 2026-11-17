@@ -414,6 +414,20 @@ Gotchas:
   (`email_confirm: true` in the admin API), and before turning sign-ups off, confirm or
   remove any account that never finished signing in.
 
+## Server-built PDF (stage three, Part C)
+
+Built and applied 2026-11-17. Rows marked Proven were run that day.
+
+| Item | Status | Evidence |
+|---|---|---|
+| An Edge Function builds a branded, two-copy, multi-page invoice PDF | Proven | `order-pdf` with `@pdfme/pdf-lib` 6.2.8 (pure JavaScript) loaded from esm.sh. Owner downloaded invoices as the LAMO admin and the Tenant B member |
+| Well within Edge Function limits | Proven | Six builds logged: 0.08-0.19 s to draw (limit 2 s of CPU), 0.7-0.9 s end to end, mostly storage round trips; 16-20 MB of 256 MB; 11-270 KB, the larger ones carrying the full-colour word mark. A local 40-line, 2-page-per-copy build took 0.13 s |
+| Read as the caller, write with the secret key | Proven | The order, branding, logo and signature are read with the caller's token, so row-level security decides access. Only the upload to the private `tenant-documents` bucket uses the secret key; the download link is signed with the caller's token again |
+| Another tenant cannot read a tenant's stored PDF, signature or build its PDF | Proven | Tenant B member refused all three on LAMO's files and order; the LAMO admin, as a control, allowed all three (temporary dev-only check, since removed) |
+| Signed-out callers refused | Proven | `order-pdf` answers "Sign in to use this function"; the signature file answers "Object not found" |
+| The PDF library embeds PNG and JPG, not SVG | Proven | Logos are stored as PNG for the PDF. A tenant's SVG logo needs a PNG copy |
+| Per-tenant invoice settings as JSON on the tenant row | Proven (defaults) | Unknown or invalid values fall back to the defaults, tested locally. Tenant- and customer-level layouts are carried to the product |
+
 ## Carried to the product
 
 The test app stays high-level: it answers whether the stack is right. These items were
