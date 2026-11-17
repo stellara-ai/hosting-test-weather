@@ -15,7 +15,7 @@ defineEmits<{ retry: [] }>()
   >
     <span
       v-if="tone === 'loading'"
-      class="mx-auto mb-3 block size-6 animate-spin rounded-full border-2 border-slate-300 border-t-sky-700"
+      class="mx-auto mb-3 block size-6 animate-spin rounded-full border-2 border-slate-300 border-t-brand"
       aria-hidden="true"
     />
     <p><slot /></p>

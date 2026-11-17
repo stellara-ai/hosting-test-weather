@@ -13,7 +13,7 @@ const { status, result, errorMessage, run } = useSecretCheck()
     </p>
     <button
       type="button"
-      class="rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-60"
+      class="rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white hover:brightness-90 disabled:opacity-60"
       :disabled="status === 'loading'"
       @click="run"
     >

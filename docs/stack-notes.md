@@ -7,6 +7,8 @@ proven or disproven.
 
 Last updated: 2026-11-16. Stage one (hosting) is complete. Stage two (sign-in, secrets,
 data security, email) is built and deployed; nine of its ten checks have passed. The wrong-API-key check is the one not yet run.
+Stage two was published to the Votel Web App on 2026-11-16 and the first two stage three
+checks (the published app) have passed.
 
 ## How to read the status labels
 
@@ -333,7 +335,89 @@ Stage two:
 | Arrival time measured on five attempts | Pass (owner-reported; individual timings not recorded. One measured send took one second from creation to the receiving server) |
 | A code arrives at an address that is not a Votel contact | Pass (owner confirmed the address is not in Votel's contacts) |
 | A code arrives for a Votel contact who unsubscribed from marketing email | Pass (contact marked unsubscribed from marketing still received the code, so `is_marketing: false` sends are not suppressed) |
-| A wrong Votel API key gives a clear failure, logged without secrets | Not run (a valid Viewer key gave a clean 403 log line, which is related but not this check) |
+| A wrong Votel API key gives a clear failure, logged without secrets | Not run, deferred to the product (covered by a unit test with a simulated reply; a valid Viewer key gave a clean 403 log line, which is related but not this check) |
+
+Stage three, Part A (the published app), 2026-11-16:
+
+| Check | Result |
+|---|---|
+| The published app signs a user in on both subdomains | Pass (owner-reported, `weather-test` and `weather-test2`) |
+| `secret-check` and notes work from the published app | Pass (owner-reported) |
+| Both subdomains serve the same build with the public Supabase values and no secret key | Pass (fetched both bundles: identical, sign-in route, project address and publishable key present; `sb_secret_` appears only as the prefix the Supabase library checks for, with no key after it) |
+| The host's assistant made no commits | Pass (`origin/main` has only the owner's commits after the publish) |
+
+Facts learned from the publish:
+
+- Supabase sessions are per browser origin. Signing in on one subdomain does not sign the
+  user in on another subdomain of the same app.
+- Session length on Supabase defaults: the access token lasts one hour and is renewed
+  automatically; the refresh token never expires and is single-use. So a user stays
+  signed in until they sign out or the browser's site data is cleared. Forced sign-out
+  (time-box, inactivity timeout, single session per user) needs the Pro plan
+  (Documented, Supabase "User sessions" guide, checked 2026-11-16). Open for the
+  product: drivers' phones can be lost or shared.
+- On the Votel Web App, `npm ci` failed for Votel's assistant and it built with
+  `npm install` instead, so the published build is not guaranteed to match the lockfile
+  (reported by Votel's assistant; `npm ci` works locally). One more reason to prefer the
+  Website upload of a tested `dist`.
+
+## Tenants, invite-only sign-in and branding (stage three, Part B)
+
+Built and applied 2026-11-16. Rows marked Proven were run that day.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Pooled multi-tenancy: one database, a `tenant_id` on every tenant-owned table, access decided by a `memberships` table through row-level security | Proven for tenants and their files | Owner signed in as three accounts on the local dev server: a LAMO admin and a Tenant B member each saw only their own business, and an account with no membership saw none. Orders and invoices follow in Part C |
+| Signed-out callers cannot read `tenants`, `memberships` or a tenant file | Proven | Public API: `42501` on both tables, "Object not found" on the file, "Bucket not found" on the public file path |
+| Invite-only, lock one: "Allow new users to sign up" off | Proven | `/auth/v1/settings` reports `disable_signup: true`; a sign-up request returns `signup_disabled` |
+| Invite-only, lock two: the form asks with `shouldCreateUser: false` | Proven | A made-up address returns `otp_disabled` (422), no email is sent, user count unchanged |
+| Same answer for any address | Proven | The form shows "If <address> has been invited, a sign-in code is on its way to it." Known limits: the reply is faster for an unknown address, and an email-sending failure is shown only for real accounts |
+| Branding through two CSS variables, fed from the tenant row | Proven (owner saw each tenant's colours on buttons and links) | Tailwind 4 needs `@theme inline` so utilities emit `var(--brand-primary)`; colours are checked as six-digit hex in the database and again in the app before use |
+| Logo from a private bucket by short-lived signed link | Proven (owner saw each tenant's logo; signed-out read refused) | One-hour link; the header falls back to the business name if the image fails |
+
+Gotchas:
+
+- The Supabase CLI refuses hosted writes from an agent run unless `--yes` is passed, and
+  says so. That includes `storage cp` and `db query`. `db query --read-only` allows only
+  plain reads, so a test that needs `set role` cannot use it.
+- `supabase storage` needs `--experimental`, and paths are written `ss:///bucket/path`.
+- A storage bucket and its policy on `storage.objects` can be created in an ordinary
+  migration.
+- "Allow new users to sign up" is a dashboard switch (Authentication > Sign In /
+  Providers). `supabase config push` would also set it but pushes the whole auth
+  section, including hooks, so it was not used.
+- RLS is checked when a statement is planned, so setting the role inside the same
+  statement does not test a policy.
+- **An unconfirmed account is locked out once sign-ups are off (Proven, 2026-11-16).**
+  Supabase treats a code request for an account whose email was never confirmed as a
+  sign-up and refuses it with `signup_disabled`; no email is sent. The form hides that
+  refusal on purpose, so the user just never gets a code. One test account was in this
+  state because its first code arrived late and was never used. Fix: set the email as
+  confirmed. Rule for the product: create invited users already confirmed
+  (`email_confirm: true` in the admin API), and before turning sign-ups off, confirm or
+  remove any account that never finished signing in.
+
+## Carried to the product
+
+The test app stays high-level: it answers whether the stack is right. These items were
+found here and are to be done when the live product is built, not in this test.
+
+| Item | Why it matters |
+|---|---|
+| Run the wrong-email-key check against the real provider | Keys expire (the test key lasts 30 days). The failure must be clear to the user and in the log, with no secrets |
+| Log the provider's reply, redacted, on every sign-in email | Votel's test endpoint leaves no trace in its own message log, so there is otherwise no audit trail |
+| Key rotation: a calendar reminder and a written procedure | Neither Supabase nor Votel shows a stored key again; rotation means create, set, delete old |
+| Decide session length | Supabase defaults keep a user signed in indefinitely; forced sign-out needs the Pro plan. Drivers' phones can be lost or shared |
+| Choose the email route (Votel test endpoint or Resend) | Waiting on Votel support's answers |
+| Pin the host's build to the lockfile, or upload a tested `dist` | Votel's assistant fell back to `npm install` |
+| Tell customers on Zoho or similar to allow the sending domain | A new sender was held until the domain was allowed |
+| Build AI first, following the product repository's `docs/ai-first-design.md` | A product requirement. Every action is one server function that screens and AI both call; the model proposes and code commits. The plumbing is to be proven in stage three of the test app (`CLAUDE.md`, "AI-first (stage three)"), not started as of 2026-11-16; so far only the secret-holding Edge Function mechanism is proven |
+| If OpenRouter is the AI gateway: set its privacy settings before real client data | Documented, read 2026-11-16, not tested. In Settings > Privacy: opt out of routing to providers that may train (separate switches for paid and free models), and consider Zero Data Retention (account-wide, per model group, or per request with `"provider": {"zdr": true}`). ZDR removes the first-party Anthropic and OpenAI endpoints (Bedrock, Vertex and Azure remain) and most Google models. OpenRouter's privacy policy says it does not train on inputs or outputs; its pages did not say what it stores itself by default, so check the dashboard. Never use free models for client data |
+| An invitation function: a tenant admin enters an address, an Edge Function creates the user and the membership | In the test this is done by hand in the dashboard. Supabase's current guidance is the `withSupabase` wrapper from `@supabase/server`, a new dependency |
+| Give a neutral answer when Supabase's one-code-per-minute limit is hit | "For security purposes, you can only request this after N seconds" is shown only for addresses that have an account, so it reveals that the address is registered |
+| Choose the tenant from the subdomain | The test takes the user's first membership |
+| For large tables, move the membership test into a `security definer` function or a JWT claim | The simple subquery policy is fine at LAMO's size; this is the documented next step if queries slow down |
+| Private repository, and sign-ups off before any real user | The test repository is public and sign-ups are open |
 
 ## What the future skill should cover
 

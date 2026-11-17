@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/*
+ * Brand colours. These are the defaults; a signed-in user's tenant overrides
+ * the two --brand-* variables at runtime (see App.vue and the tenant store).
+ * `inline` makes the utilities emit var(--brand-*) directly, so an override
+ * set on any ancestor element takes effect.
+ */
+:root {
+  --brand-primary: #0369a1;
+  --brand-accent: #0369a1;
+}
+
+@theme inline {
+  --color-brand: var(--brand-primary);
+  --color-accent: var(--brand-accent);
+}

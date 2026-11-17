@@ -19,7 +19,7 @@ const options: { value: Unit; label: string; name: string }[] = [
       class="min-w-11 px-3 py-2 text-sm font-medium"
       :class="
         preferences.unit === option.value
-          ? 'bg-sky-700 text-white'
+          ? 'bg-brand text-white'
           : 'bg-white text-slate-600 hover:bg-slate-100'
       "
       :aria-pressed="preferences.unit === option.value"

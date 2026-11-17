@@ -14,9 +14,9 @@ const { step, email, code, pending, errorMessage, requestCode, verifyCode, start
 )
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base placeholder:text-slate-400 focus:border-sky-600 focus:outline-2 focus:outline-sky-600'
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base placeholder:text-slate-400 focus:border-brand focus:outline-2 focus:outline-brand'
 const buttonClass =
-  'w-full rounded-lg bg-sky-700 px-4 py-2.5 text-base font-medium text-white hover:bg-sky-800 disabled:opacity-60'
+  'w-full rounded-lg bg-brand px-4 py-2.5 text-base font-medium text-white hover:brightness-90 disabled:opacity-60'
 </script>
 
 <template>
@@ -41,8 +41,8 @@ const buttonClass =
 
     <form v-else class="space-y-3" @submit.prevent="verifyCode">
       <p class="text-sm text-slate-600">
-        We sent a sign-in code to <span class="font-medium text-slate-900">{{ email }}</span
-        >.
+        If <span class="font-medium text-slate-900">{{ email }}</span> has been invited, a
+        sign-in code is on its way to it.
       </p>
       <label for="sign-in-code" class="block text-sm font-medium text-slate-700">Code</label>
       <input
@@ -60,7 +60,7 @@ const buttonClass =
       </button>
       <button
         type="button"
-        class="w-full py-2 text-sm font-medium text-sky-700 underline hover:text-sky-900"
+        class="w-full py-2 text-sm font-medium text-accent underline hover:brightness-75"
         @click="startOver"
       >
         Use a different email

@@ -21,7 +21,7 @@ function toggle() {
     :class="
       saved
         ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-        : 'border-sky-700 bg-sky-700 text-white hover:bg-sky-800'
+        : 'border-brand bg-brand text-white hover:brightness-90'
     "
     :aria-pressed="saved"
     @click="toggle"

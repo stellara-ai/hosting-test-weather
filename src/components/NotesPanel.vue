@@ -26,12 +26,12 @@ async function submit() {
         required
         maxlength="500"
         placeholder="Write a note"
-        class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base placeholder:text-slate-400 focus:border-sky-600 focus:outline-2 focus:outline-sky-600"
+        class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base placeholder:text-slate-400 focus:border-brand focus:outline-2 focus:outline-brand"
       />
       <button
         type="submit"
         :disabled="saving || status === 'loading' || status === 'error'"
-        class="rounded-lg bg-sky-700 px-4 py-2.5 text-base font-medium text-white hover:bg-sky-800 disabled:opacity-60"
+        class="rounded-lg bg-brand px-4 py-2.5 text-base font-medium text-white hover:brightness-90 disabled:opacity-60"
       >
         Add
       </button>

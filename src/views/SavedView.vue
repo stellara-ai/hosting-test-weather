@@ -10,7 +10,7 @@ const preferences = usePreferencesStore()
     <h1 class="text-2xl font-semibold">Saved cities</h1>
     <StatusMessage v-if="preferences.savedCities.length === 0" tone="empty">
       No saved cities yet.
-      <RouterLink :to="{ name: 'home' }" class="font-medium text-sky-700 underline">
+      <RouterLink :to="{ name: 'home' }" class="font-medium text-accent underline">
         Search for one
       </RouterLink>
       and save it.
@@ -23,7 +23,7 @@ const preferences = usePreferencesStore()
       >
         <RouterLink
           :to="{ name: 'city', params: { name: city } }"
-          class="min-w-0 flex-1 truncate py-2 font-medium text-sky-700 hover:underline"
+          class="min-w-0 flex-1 truncate py-2 font-medium text-accent hover:underline"
         >
           {{ city }}
         </RouterLink>

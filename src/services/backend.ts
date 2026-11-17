@@ -23,6 +23,17 @@ export interface SecretCheck {
   length: number
 }
 
+export interface Tenant {
+  id: string
+  slug: string
+  name: string
+  role: 'admin' | 'member'
+  primaryColor: string
+  accentColor: string
+  /** A short-lived link to the logo or word mark, or null when there is none. */
+  logoUrl: string | null
+}
+
 export interface Backend {
   /** The signed-in user restored from the stored session, or null. */
   getUser(): Promise<AuthUser | null>
@@ -35,6 +46,8 @@ export interface Backend {
   addNote(body: string): Promise<Note>
   deleteNote(id: string): Promise<void>
   checkSecret(): Promise<SecretCheck>
+  /** The business the signed-in user belongs to, or null when they belong to none. */
+  getTenant(): Promise<Tenant | null>
 }
 
 export class BackendError extends Error {
@@ -47,6 +60,34 @@ interface NoteRow {
   id: string
   body: string
   created_at: string
+}
+
+const TENANT_COLUMNS =
+  'role, tenants (id, slug, name, logo_path, primary_color, accent_color)'
+const TENANT_FILES_BUCKET = 'tenant-assets'
+const LOGO_LINK_SECONDS = 3600
+
+interface MembershipRow {
+  role: 'admin' | 'member'
+  tenants: {
+    id: string
+    slug: string
+    name: string
+    logo_path: string | null
+    primary_color: string
+    accent_color: string
+  } | null
+}
+
+/**
+ * True when Supabase refused a code request because the address has no
+ * account. Accounts are created by invitation only, so the sign-in form
+ * treats this like a success and gives the same answer for every address.
+ */
+export function isUnknownAddressError(error: { code?: string }): boolean {
+  // otp_disabled: asked with account creation off and no account exists.
+  // signup_disabled: the project has sign-ups turned off.
+  return error.code === 'otp_disabled' || error.code === 'signup_disabled'
 }
 
 let client: SupabaseClient | null = null
@@ -83,8 +124,12 @@ export const backend: Backend = {
   },
 
   async requestCode(email) {
-    const { error } = await getClient().auth.signInWithOtp({ email })
-    if (!error) return
+    const { error } = await getClient().auth.signInWithOtp({
+      email,
+      // Invite-only: never create an account from the sign-in form.
+      options: { shouldCreateUser: false },
+    })
+    if (!error || isUnknownAddressError(error)) return
     // A failure in the Send Email hook surfaces as a 5xx with Supabase's
     // internal wording, which means nothing to the person signing in.
     const emailFailed = typeof error.status === 'number' && error.status >= 500
@@ -137,5 +182,37 @@ export const backend: Backend = {
       throw new BackendError('The secret check was refused or could not be reached.')
     }
     return { found: data.found, length: data.length }
+  },
+
+  async getTenant() {
+    // Row-level security returns only the caller's own memberships. A user
+    // in several businesses gets the first one; the product will pick the
+    // business from the subdomain instead.
+    const { data, error } = await getClient()
+      .from('memberships')
+      .select(TENANT_COLUMNS)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new BackendError(error.message)
+    const row = data as unknown as MembershipRow | null
+    if (!row?.tenants) return null
+
+    let logoUrl: string | null = null
+    if (row.tenants.logo_path) {
+      const signed = await getClient()
+        .storage.from(TENANT_FILES_BUCKET)
+        .createSignedUrl(row.tenants.logo_path, LOGO_LINK_SECONDS)
+      logoUrl = signed.data?.signedUrl ?? null
+    }
+    return {
+      id: row.tenants.id,
+      slug: row.tenants.slug,
+      name: row.tenants.name,
+      role: row.role,
+      primaryColor: row.tenants.primary_color,
+      accentColor: row.tenants.accent_color,
+      logoUrl,
+    }
   },
 }

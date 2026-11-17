@@ -25,3 +25,6 @@ coverage
 .eslintcache
 *.timestamp-*-*.mjs
 .playwright-mcp
+
+# Client brand assets stay local (see brand-assets/README.md)
+brand-assets/*/

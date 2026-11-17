@@ -30,7 +30,7 @@ function search(name: string) {
       <template #actions="{ weather: result }">
         <RouterLink
           :to="{ name: 'city', params: { name: result.place.name } }"
-          class="py-2 text-sm font-medium text-sky-700 underline hover:text-sky-900"
+          class="py-2 text-sm font-medium text-accent underline hover:brightness-75"
         >
           Open city page
         </RouterLink>
