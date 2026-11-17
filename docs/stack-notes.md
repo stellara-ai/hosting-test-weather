@@ -357,9 +357,15 @@ Facts learned from the publish:
   (Documented, Supabase "User sessions" guide, checked 2026-11-16). Open for the
   product: drivers' phones can be lost or shared.
 - On the Votel Web App, `npm ci` failed for Votel's assistant and it built with
-  `npm install` instead, so the published build is not guaranteed to match the lockfile
-  (reported by Votel's assistant; `npm ci` works locally). One more reason to prefer the
-  Website upload of a tested `dist`.
+  `npm install` instead, so that published build was not guaranteed to match the
+  lockfile. Cause found 2026-11-16 (Proven, reproduced locally): the lockfile was written
+  by npm 11, which left out two optional packages (`@emnapi/core` and `@emnapi/runtime`,
+  needed only by a WebAssembly fallback of the build tool). npm 11 accepts that
+  lockfile; npm 10, which the host appears to use, rejects it as out of sync. Fix:
+  regenerate with `npx npm@10 install --package-lock-only`; the result passes `npm ci`
+  on both versions. Rule: after any dependency change, run
+  `npx npm@10 ci --dry-run --ignore-scripts` before pushing, and in a host prompt tell
+  the assistant to stop if `npm ci` fails.
 
 ## Tenants, invite-only sign-in and branding (stage three, Part B)
 
