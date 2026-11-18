@@ -36,6 +36,13 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // Supabase Auth's OAuth server sends people here to approve an outside app.
+      path: '/oauth/consent',
+      name: 'oauth-consent',
+      component: () => import('@/views/OAuthConsentView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),

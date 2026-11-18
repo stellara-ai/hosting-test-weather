@@ -49,6 +49,15 @@ export interface OrderPdfLink {
   measurements: { bytes: number; buildMs: number; totalMs: number; heapMb: number }
 }
 
+/** An outside app (for example an AI agent) asking to act as the signed-in user. */
+export interface AuthorizationRequest {
+  id: string
+  clientName: string
+  clientUri: string
+  redirectUri: string
+  scopes: string[]
+}
+
 export interface Backend {
   /** The signed-in user restored from the stored session, or null. */
   getUser(): Promise<AuthUser | null>
@@ -67,6 +76,13 @@ export interface Backend {
   listOrders(): Promise<OrderSummary[]>
   /** Builds the invoice PDF for an order and returns a short-lived download link. */
   getOrderPdfLink(orderId: string): Promise<OrderPdfLink>
+  /**
+   * Details of a pending sign-in request from an outside app, or the address
+   * to return to when the user already approved this app.
+   */
+  getAuthorizationRequest(id: string): Promise<AuthorizationRequest | { redirectUrl: string }>
+  /** Approves or refuses the request; returns the address to send the user back to. */
+  decideAuthorization(id: string, approve: boolean): Promise<string>
 }
 
 export class BackendError extends Error {
@@ -275,5 +291,27 @@ export const backend: Backend = {
     })
     if (error || !data?.url) throw new BackendError('The invoice PDF could not be created.')
     return { url: data.url, measurements: data.measurements }
+  },
+
+  async getAuthorizationRequest(id) {
+    const { data, error } = await getClient().auth.oauth.getAuthorizationDetails(id)
+    if (error || !data) throw new BackendError(error?.message ?? 'This request could not be found.')
+    if (!('authorization_id' in data)) return { redirectUrl: data.redirect_url }
+    return {
+      id: data.authorization_id,
+      clientName: data.client.name,
+      clientUri: data.client.uri,
+      redirectUri: data.redirect_uri,
+      scopes: data.scope.split(' ').filter(Boolean),
+    }
+  },
+
+  async decideAuthorization(id, approve) {
+    const oauth = getClient().auth.oauth
+    const { data, error } = approve
+      ? await oauth.approveAuthorization(id, { skipBrowserRedirect: true })
+      : await oauth.denyAuthorization(id, { skipBrowserRedirect: true })
+    if (error || !data) throw new BackendError(error?.message ?? 'Your answer could not be saved.')
+    return data.redirect_url
   },
 }

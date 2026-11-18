@@ -261,6 +261,9 @@ product starts.
   migration was pushed and `order-pdf` deployed. The library is loaded from esm.sh, not
   `npm:` (see `docs/stack-notes.md`). Passed on 2026-11-17: the owner downloaded
   invoices as the LAMO admin and as the Tenant B member on the local dev server.
+  Published to Votel the same day from commit `369f8c8` (Votel's assistant: `npm ci`
+  and build passed, both subdomains serve the build; the Invoice PDF code was confirmed
+  in the live bundle).
 - Approved dependencies (owner, 2026-11-17): `@pdfme/pdf-lib` for this spike;
   `@modelcontextprotocol/sdk` and `zod` for Part F.
 - **Layout follows LAMO's sample invoices (owner, 2026-11-17; samples in
@@ -353,6 +356,14 @@ Each business sets up its own invoice; nothing below is fixed in code:
     (and the rules for its start URL and icons), and whether branding can be shown before
     sign-in, since today a tenant's name, logo and colours are readable only by its
     members. Candidate spike (Part G), not agreed yet.
+- **One shared sign-in address for outside apps (owner, 2026-11-17).** Supabase has a
+  single Site URL per project, so the page where a person approves an outside app (an AI
+  agent over MCP) lives at one address for every business, not on each business's own
+  subdomain. Decided: accept one shared sign-in address (for example `account.` plus the
+  product's domain) and brand the page from the person's business after sign-in. A
+  person signed in only on their business's subdomain signs in again there, because
+  each address keeps its own session. In this test that address is
+  `https://weather-test.stellarasystems.com/oauth/consent`; `weather-test2` uses it too.
 - **Logo upload (owner, 2026-11-17; refined with Claude's recommendations).** A business
   admin uploads its own logo, with a live preview of the invoice and app header before
   saving. Upload text:
@@ -392,8 +403,9 @@ Each business sets up its own invoice; nothing below is fixed in code:
   dark-mode word marks and logos as PNG, and a brand board with the colours. Always take
   LAMO's logo and colours from there, never make a placeholder (owner, 2026-11-17). The
   light-mode word mark is used on white (the PDF and the app, which has no dark mode);
-  primary Warm Brown `#521F12`, accent Leaf Green `#527A38`. Open question for the
-  owner: the light word mark reads "LAMO", the dark one and the brand board "Lamo".
+  primary Warm Brown `#521F12`, accent Leaf Green `#527A38`. Settled (owner,
+  2026-11-17): the name is written "LAMO"; the owner will supply a dark-mode word mark
+  corrected to match.
 - Planned approach: server-triggered printing through a cloud print service with an
   agent on a computer beside the printer, behind a `PrintProvider` interface, fed from a
   `print_jobs` queue table. To be tried with the real printer before it is designed in.

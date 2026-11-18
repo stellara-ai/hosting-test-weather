@@ -13,6 +13,12 @@ verify_jwt = true
 [functions.order-pdf]
 verify_jwt = true
 
+# MCP server for outside AI agents. Requests without a token must reach the
+# function so it can answer 401 with the sign-in discovery header; the
+# function checks the OAuth access token itself.
+[functions.mcp]
+verify_jwt = false
+
 # Called by Supabase Auth's Send Email hook, which sends no user JWT.
 # The function verifies the hook signature itself.
 [functions.send-email]
