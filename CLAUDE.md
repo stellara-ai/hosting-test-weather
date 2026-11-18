@@ -268,10 +268,14 @@ product starts.
   the top left; "Invoice" with Date, Ship Date and Invoice # at the top right; Bill To and
   Ship To boxes, each with name and address; a table of Quantity, Item Code, Description,
   Price Each and Amount; the Total in a box at the bottom, beside the delivery signature.
-  31 lines per page; longer invoices continue onto further pages, each repeating the
-  header and the Bill To and Ship To boxes, with "Continued on next page" at the foot of
-  every page but the last, which carries the Total and signature. Capped at 10 pages per
-  copy (more is refused with a clear message). Helvetica 9 pt. Migration `20261117240000_invoice_fields.sql` adds the fields.
+  Auto-fit (owner, 2026-11-17): up to 31 lines print at the normal size (Helvetica
+  9 pt, 12 pt rows). From 32 to 47 lines the Bill To and Ship To boxes shorten and the
+  rows tighten just enough to stay on one page, down to 7 pt text on 8.4 pt rows, as on
+  LAMO's own long invoices (the August samples average 14 lines, the longest 47, all on
+  one page; 7 of 82 exceed 31). Beyond 47, pages continue at the tightest size, each
+  repeating the header and the Bill To and Ship To boxes, with "Continued on next page"
+  at the foot of every page but the last, which carries the Total and signature. Capped
+  at 10 pages per copy (more is refused with a clear message). Migration `20261117240000_invoice_fields.sql` adds the fields.
   LAMO's real contact details are applied from `brand-assets/lamo/contact.sql`
   (git-ignored), never committed. The samples' P.O. Number, Terms, Rep, Via, F.O.B. and
   Project row is left out until the owner asks for it.
@@ -328,6 +332,41 @@ Each business sets up its own invoice; nothing below is fixed in code:
 - The invoice settings are changed only by an admin of that business, on a settings
   screen with a live preview. The test's `tenants.invoice_settings` is the starting
   point: it plays the role of the tenant's default layout.
+- **White label: favicon and app icon (owner, 2026-11-17; documented, not built).** Each
+  business uploads, beside its logo:
+  - Favicon (browser tab icon): ICO or PNG, square, up to 1 MB. Recommended: PNG at least
+    48 x 48. If none is uploaded, it is made from the app icon.
+  - App icon (home screen icon when installed as an app): PNG, square, up to 2 MB, at
+    least 512 x 512 (required, not only recommended). Keep the artwork inside the centre
+    80 % so Android's rounded "maskable" crop does not cut it, and on a solid background
+    because iOS fills transparent areas with black. The browser makes the other sizes on
+    upload: 192 x 192 and 512 x 512 for Android and Chromium (both are required to
+    install, per web.dev, checked 2026-11-17) and 180 x 180 for iOS.
+  - Also per business: the installed app's name and short name, and its theme colour
+    (the primary brand colour).
+  - **Open stack question, to prove before the product relies on it.** The app is one
+    static build on Votel, so the favicon, the app icon and the install manifest cannot
+    differ per business from static files. The likely route: recognise the business from
+    the subdomain before sign-in, swap the favicon and the iOS icon link in the page, and
+    serve each business's manifest from an Edge Function. Not yet verified: whether
+    browsers accept a manifest from the Supabase domain for a page on the Votel domain
+    (and the rules for its start URL and icons), and whether branding can be shown before
+    sign-in, since today a tenant's name, logo and colours are readable only by its
+    members. Candidate spike (Part G), not agreed yet.
+- **Logo upload (owner, 2026-11-17; refined with Claude's recommendations).** A business
+  admin uploads its own logo, with a live preview of the invoice and app header before
+  saving. Upload text:
+  - Main brand logo: SVG, PNG or JPG, up to 5 MB. Recommended: SVG, or PNG at least
+    1000 px wide (printing needs about 700 px at the invoice's 2.4 inches), wide format
+    of about 2.5 : 1, transparent background, dark or full-colour artwork for white
+    backgrounds. The owner's first draft said 260 x 104 px, which prints blurry.
+  - Logo for dark backgrounds (optional): same formats, light artwork.
+  - On upload the browser keeps the original privately and makes right-sized PNG copies
+    for the screen and the PDF, plus a grey copy for black-and-white invoices. SVGs are
+    converted this way because the PDF library cannot embed SVG; image libraries such as
+    sharp do not run in Edge Functions, while the browser canvas can resize and convert.
+  - An uploaded SVG is never served as-is (it can carry script); only the PNG copies are
+    shown. The PDF-sized copy keeps invoices around 50-80 KB instead of 250 KB.
 
 **Part F: MCP spike**
 

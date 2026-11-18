@@ -5,9 +5,12 @@
  * of line items, and a Total box beside the delivery signature. One set of
  * pages per labelled copy ("Business copy", "Client copy").
  *
- * Long invoices continue onto further pages. Every page repeats the header,
- * Bill To and Ship To; every page but the last ends "Continued on next page";
- * the last carries the Total and the signature.
+ * Auto-fit: up to 31 lines print at the normal size. Longer invoices tighten
+ * the Bill To and Ship To boxes and the rows to stay on one page, as LAMO's
+ * current invoices do (up to 47 lines). Beyond that they continue onto
+ * further pages at the tightest size. Every page repeats the header, Bill To
+ * and Ship To; every page but the last ends "Continued on next page"; the
+ * last carries the Total and the signature.
  *
  * Each business chooses which optional fields print, which columns the table
  * has, colour or black and white, the table lines, and page numbers (see
@@ -186,14 +189,63 @@ const MARGIN = 36
 const ROW = 12
 const TOP = PageSizes.Letter[1] - MARGIN
 const PARTIES_TOP = TOP - 132
-const PARTY_HEIGHT = 84
-const TABLE_TOP = PARTIES_TOP - PARTY_HEIGHT - 14
 const FOOTER_ROW = 66
 const TABLE_BOTTOM = MARGIN + 18 + FOOTER_ROW
-const FIRST_ROW = TABLE_TOP - 31
 
-/** How many line items fit on one page. */
-export const LINES_PER_PAGE = Math.floor((FIRST_ROW - (TABLE_BOTTOM + 4)) / ROW) + 1
+/** Normal size, as on LAMO's sample invoices. */
+const NORMAL = { partyHeight: 84, row: 12, fontSize: 9 }
+/** The tightest auto-fit size: still legible when printed. */
+const COMPACT = { partyHeight: 66, row: 8.4, fontSize: 7 }
+
+/** Sizes for one invoice, chosen by chooseLayout. */
+export interface Layout {
+  partyHeight: number
+  tableTop: number
+  firstRow: number
+  row: number
+  fontSize: number
+  linesPerPage: number
+}
+
+function tableTop(partyHeight: number) {
+  return PARTIES_TOP - partyHeight - 14
+}
+
+/** Room for line items: from the first row's baseline down to just above the bottom row. */
+function rowSpace(partyHeight: number) {
+  return tableTop(partyHeight) - 31 - (TABLE_BOTTOM + 4)
+}
+
+function capacity(partyHeight: number, row: number) {
+  return Math.floor(rowSpace(partyHeight) / row + 1e-9) + 1
+}
+
+/** Lines that fit on one page at the normal size (31). */
+export const NORMAL_LINES = capacity(NORMAL.partyHeight, NORMAL.row)
+/** Lines that fit on one page at the tightest size (47). */
+export const COMPACT_LINES = capacity(COMPACT.partyHeight, COMPACT.row)
+
+function layoutFor(partyHeight: number, row: number): Layout {
+  const top = tableTop(partyHeight)
+  return {
+    partyHeight,
+    tableTop: top,
+    firstRow: top - 31,
+    row,
+    // Text shrinks with the row, from 9 pt at the normal size to 7 pt at the tightest.
+    fontSize: Math.max(COMPACT.fontSize, Math.min(NORMAL.fontSize, 7 + ((row - COMPACT.row) * 2) / (NORMAL.row - COMPACT.row))),
+    linesPerPage: capacity(partyHeight, row),
+  }
+}
+
+/** Picks the size for an invoice with this many lines. */
+export function chooseLayout(lineCount: number): Layout {
+  if (lineCount <= NORMAL_LINES) return layoutFor(NORMAL.partyHeight, NORMAL.row)
+  if (lineCount > COMPACT_LINES) return layoutFor(COMPACT.partyHeight, COMPACT.row)
+  // Just tight enough to fit every line on one page.
+  const row = Math.min(NORMAL.row, Math.max(COMPACT.row, rowSpace(COMPACT.partyHeight) / (lineCount - 1)))
+  return layoutFor(COMPACT.partyHeight, row)
+}
 
 /** A cap on pages per copy, which bounds the function's processing time. */
 export const MAX_PAGES = 10
@@ -257,10 +309,10 @@ function lines(text: string): string[] {
     .filter((line) => line.length > 0)
 }
 
-/** Splits the lines into pages of at most LINES_PER_PAGE (at least one page). */
-export function paginate<T>(items: T[]): T[][] {
+/** Splits the lines into pages of at most perPage (at least one page). */
+export function paginate<T>(items: T[], perPage: number): T[][] {
   const pages: T[][] = []
-  for (let i = 0; i < items.length; i += LINES_PER_PAGE) pages.push(items.slice(i, i + LINES_PER_PAGE))
+  for (let i = 0; i < items.length; i += perPage) pages.push(items.slice(i, i + perPage))
   return pages.length > 0 ? pages : [[]]
 }
 
@@ -383,6 +435,7 @@ function palette(data: InvoiceData): Palette {
 
 interface PageContext {
   data: InvoiceData
+  layout: Layout
   fonts: Fonts
   colours: Palette
   logo: PDFImage | null
@@ -454,50 +507,59 @@ function drawHeader(page: PDFPage, ctx: PageContext, left: number, right: number
 
   // Bill To and Ship To.
   const partyWidth = (right - left - 24) / 2
-  partyBox(page, 'Bill To', data.billTo, left, partyWidth, fonts)
-  partyBox(page, 'Ship To', data.shipTo, left + partyWidth + 24, partyWidth, fonts)
+  const height = ctx.layout.partyHeight
+  partyBox(page, 'Bill To', data.billTo, left, partyWidth, height, fonts)
+  partyBox(page, 'Ship To', data.shipTo, left + partyWidth + 24, partyWidth, height, fonts)
 }
 
-/** A titled box (Bill To, Ship To) holding a name and address. */
-function partyBox(page: PDFPage, title: string, party: Party, x: number, width: number, fonts: Fonts) {
+/** A titled box (Bill To, Ship To) holding a name and as many address lines as fit. */
+function partyBox(page: PDFPage, title: string, party: Party, x: number, width: number, height: number, fonts: Fonts) {
   const top = PARTIES_TOP
-  box(page, x, top - PARTY_HEIGHT, width, PARTY_HEIGHT)
+  box(page, x, top - height, width, height)
   box(page, x, top - 16, width, 16, SHADE)
   text(page, title, x + 6, top - 12, fonts.bold, 9)
+  // The shorter auto-fit box uses tighter lines so a name and three address
+  // lines always fit.
+  const compact = height < NORMAL.partyHeight
+  const step = compact ? 10 : ROW
+  const size = compact ? 8 : 9
+  const fits = Math.floor((height - 34) / step) + 1
   let y = top - 30
-  for (const [i, line] of [party.name, ...lines(party.address)].slice(0, 5).entries()) {
-    text(page, line, x + 6, y, i === 0 ? fonts.bold : fonts.regular, 9, { maxWidth: width - 12 })
-    y -= ROW
+  for (const [i, line] of [party.name, ...lines(party.address)].slice(0, fits).entries()) {
+    text(page, line, x + 6, y, i === 0 ? fonts.bold : fonts.regular, size, { maxWidth: width - 12 })
+    y -= step
   }
 }
 
 function drawTable(page: PDFPage, ctx: PageContext, pageLines: InvoiceLine[], left: number, right: number) {
-  const { data, fonts, colours } = ctx
+  const { data, fonts, colours, layout } = ctx
   const columns = placeColumns(data.options.columns, left, right)
   const tableLines = data.options.tableLines
+  const tableTopY = layout.tableTop
 
-  box(page, left, TABLE_BOTTOM, right - left, TABLE_TOP - TABLE_BOTTOM)
-  page.drawRectangle({ x: left, y: TABLE_TOP - 18, width: right - left, height: 18, color: colours.headerFill })
+  box(page, left, TABLE_BOTTOM, right - left, tableTopY - TABLE_BOTTOM)
+  page.drawRectangle({ x: left, y: tableTopY - 18, width: right - left, height: 18, color: colours.headerFill })
   for (const column of columns) {
-    text(page, column.heading, (column.left + column.right) / 2, TABLE_TOP - 13, fonts.bold, 9, {
+    text(page, column.heading, (column.left + column.right) / 2, tableTopY - 13, fonts.bold, 9, {
       color: colours.headerText,
       align: 'center',
       maxWidth: column.right - column.left - 6,
     })
   }
   if (tableLines !== 'none') {
-    for (const column of columns.slice(1)) vline(page, column.left, TABLE_TOP, TABLE_BOTTOM)
+    for (const column of columns.slice(1)) vline(page, column.left, tableTopY, TABLE_BOTTOM)
   }
 
-  let rowY = FIRST_ROW
+  let rowY = layout.firstRow
   for (const line of pageLines) {
     for (const column of columns) {
       const width = column.right - column.left - 10
       const x = column.align === 'right' ? column.right - 5 : column.left + 5
-      text(page, column.value(line), x, rowY, fonts.regular, 9, { align: column.align, maxWidth: width })
+      text(page, column.value(line), x, rowY, fonts.regular, layout.fontSize, { align: column.align, maxWidth: width })
     }
-    if (tableLines === 'grid') hline(page, left, right, rowY - 3.5)
-    rowY -= ROW
+    // Halfway between this row's descenders and the next row's capitals.
+    if (tableLines === 'grid') hline(page, left, right, rowY - (2 + layout.row - layout.fontSize * 0.7) / 2)
+    rowY -= layout.row
   }
 }
 
@@ -554,10 +616,11 @@ function drawFooter(page: PDFPage, ctx: PageContext, left: number, right: number
 // ---------------------------------------------------------------------------
 
 export async function buildInvoicePdf(data: InvoiceData): Promise<Uint8Array> {
-  const pages = paginate(data.lines)
+  const layout = chooseLayout(data.lines.length)
+  const pages = paginate(data.lines, layout.linesPerPage)
   if (pages.length > MAX_PAGES) {
     throw new TooManyLinesError(
-      `This invoice has ${data.lines.length} lines; at most ${MAX_PAGES * LINES_PER_PAGE} fit (${MAX_PAGES} pages).`,
+      `This invoice has ${data.lines.length} lines; at most ${MAX_PAGES * layout.linesPerPage} fit (${MAX_PAGES} pages).`,
     )
   }
   const doc = await PDFDocument.create()
@@ -581,6 +644,7 @@ export async function buildInvoicePdf(data: InvoiceData): Promise<Uint8Array> {
       const right = page.getWidth() - MARGIN
       const ctx: PageContext = {
         data,
+        layout,
         fonts,
         colours,
         logo,

@@ -428,6 +428,31 @@ Built and applied 2026-11-17. Rows marked Proven were run that day.
 | The PDF library embeds PNG and JPG, not SVG | Proven | Logos are stored as PNG for the PDF. A tenant's SVG logo needs a PNG copy |
 | Per-tenant invoice settings as JSON on the tenant row | Proven (defaults) | Unknown or invalid values fall back to the defaults, tested locally. Tenant- and customer-level layouts are carried to the product |
 
+## Supabase plan and limits for a real tenant (checked 2026-11-17)
+
+Per-request limits are not a concern: an invoice took 0.08-0.19 s of a 2 s CPU limit and
+16-20 MB of 256 MB, and extra pages add little (a 4-page build took no longer than a
+1-page one locally).
+
+Monthly quotas, against LAMO's real volume. Measured from its August 2026 sample
+invoices (read locally, never committed): invoice numbers 302751 to 302866 between
+8/2 and 8/30, so about 116 invoices that month if the numbering is shared across
+customers; the five hospitals in the samples account for 82 of them. About 14 line items
+on average, 47 at most, all on one page. Sizing below allows ten times that volume:
+
+| Item | LAMO estimate | Free | Pro ($25/month per organization) |
+|---|---|---|---|
+| Storage (PDFs, signatures) | ~30 MB a month at 250 KB per PDF; ~8 MB with a PDF-sized logo | 1 GB | 100 GB |
+| Database | a few MB a month | 500 MB per project | 8 GB per project |
+| Edge Function invocations | a few hundred a month | 500,000 | 2 million |
+| Egress | tens of MB a month | 5 GB | 250 GB |
+| Monthly active users | dozens | 50,000 | 100,000 |
+
+Recommendation: run production on Pro from launch. The deciding reasons are not the
+quotas: a Free project is paused after about a week of low activity, session time limits
+and inactivity timeouts need Pro, and Pro includes daily backups. Pro's $10 compute
+credit covers one small project, so about $25 a month. The test project stays on Free.
+
 ## Carried to the product
 
 The test app stays high-level: it answers whether the stack is right. These items were
