@@ -428,6 +428,41 @@ Built and applied 2026-11-17. Rows marked Proven were run that day.
 | The PDF library embeds PNG and JPG, not SVG | Proven | Logos are stored as PNG for the PDF. A tenant's SVG logo needs a PNG copy |
 | Per-tenant invoice settings as JSON on the tenant row | Proven (defaults) | Unknown or invalid values fall back to the defaults, tested locally. Tenant- and customer-level layouts are carried to the product |
 
+## MCP server with per-user sign-in (stage three, Part F)
+
+Built, deployed and passed 2026-11-17.
+
+| Item | Status | Evidence |
+|---|---|---|
+| An MCP server runs as a Supabase Edge Function | Proven | `mcp`, official `@modelcontextprotocol/sdk` 1.32.2 from `npm:` (boots fine, unlike the PDF library), stateless Streamable HTTP with JSON responses, a new server per request |
+| Outside AI apps sign in as an existing user through Supabase Auth's OAuth 2.1 server | Proven | Claude Code (`claude mcp add --transport http`) found the sign-in through the 401 `WWW-Authenticate: Bearer resource_metadata=...` header, registered itself (dynamic client registration), sent the owner to the app's `/oauth/consent` page, and got a token after Allow |
+| Tools run as that user, so row-level security keeps tenants apart | Proven | `list_orders`: LAMO admin saw 1001 and 1002 only; Tenant B member saw B-1 only; the account with no membership got "No business is linked to this account" and no orders |
+| Unsigned callers refused, with sign-in discovery | Proven | No token, a malformed token, a random string, or the publishable key alone: 401 with the discovery header |
+| The tool list comes from one catalog | Proven | `_shared/toolCatalog.ts`; Claude saw exactly the catalog's one tool and description |
+
+Setup and gotchas:
+
+- Turn on the OAuth 2.1 server (beta, free on all plans) in the dashboard under
+  Authentication > OAuth Server: the switch, the Authorization Path (`/oauth/consent`),
+  and "Allow Dynamic OAuth Apps" so MCP clients can register themselves. Then
+  `/.well-known/oauth-authorization-server/auth/v1` answers; before, it returns
+  `feature_disabled`.
+- The consent page lives at the project's single Site URL plus the path, so every
+  tenant shares one sign-in address for outside apps (decided: accept it, brand the page
+  after sign-in). It must be published before an outside app can finish signing in.
+- Set `verify_jwt = false` for the MCP function: unauthenticated discovery requests must
+  reach the code to get the `WWW-Authenticate` header. Check the token in code.
+- `auth.getClaims` throws, rather than returning an error, on a string that is not a JWT;
+  catch it, or a malformed token becomes a 500.
+- The project's JWT signing keys were already asymmetric (ES256), which Supabase
+  recommends for OAuth and requires for OpenID ID tokens.
+- To switch the test user: sign out on the site, then clear the client's sign-in
+  (Claude Code: `/mcp`, the server, Clear authentication) before authenticating again,
+  or the consent page reuses the old session.
+- Not built here, carried to the product: write tools with confirmation over MCP, a
+  "Connected apps" screen where a user sees and revokes access (Supabase can list and
+  revoke grants), and logging each MCP call like an `ai_runs` row.
+
 ## Supabase plan and limits for a real tenant (checked 2026-11-17)
 
 Per-request limits are not a concern: an invoice took 0.08-0.19 s of a 2 s CPU limit and
