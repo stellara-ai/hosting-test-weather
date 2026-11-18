@@ -84,6 +84,31 @@ dev only) and, inside the `send-email` function only, `npm:standardwebhooks@1`.
 - Report each test check as pass, fail or not applicable, and only after actually
   running it.
 
+## Remaining for the proof of concept (as of 2026-11-17)
+
+Stages one to three are done: hosting, sign-in, secrets, email, tenants, branding, the
+PDF spike (Part C), the MCP spike (Part F) and the printing trial (Part D, email print)
+all passed. Left:
+
+1. **Votel attachment test (planned for 2026-11-18).** One send through Votel's
+   `/api/emails/test` with the invoice PDF attached, first to the owner's inbox, then to
+   LAMO's Epson printer address. Settles the undocumented `attachments` format. Needs
+   LAMO's Votel sub-account API key set as a Supabase secret by the owner, and the
+   sub-account's sender address on the printer's allowed-senders list.
+2. **Second printer's email address:** pending from the owner.
+3. **Votel support answers** (asked 2026-11-15): is `/api/emails/test` supported for
+   production, plus the attachment format. Decides Votel or a dedicated email provider.
+4. **Product spec review:** `docs/lamo-product-spec.md` is a draft. The owner reviews its
+   flagged guesses (AI kept off finalise, delivery, signature, invites and "apply to all";
+   a driver role; several ship-to addresses per customer; prices copied onto order
+   lines; order entry in scope), then it moves to `stellara-ai/distributor-order-portal`
+   under `docs/` (the owner said not to clone that repository yet).
+5. **Then stop this test and start the product.**
+
+Not needed to finish the test (carried to the product): white-label icons and
+per-business manifest, the wrong-Votel-key check, session timeouts on Pro, MCP write
+tools with confirmation, a "Connected apps" screen, logo upload.
+
 ## Results so far
 
 Stage one hosting checks. All six passed, as reported by the owner on 2026-11-15, on the
@@ -408,9 +433,20 @@ Each business sets up its own invoice; nothing below is fixed in code:
   primary Warm Brown `#521F12`, accent Leaf Green `#527A38`. Settled (owner,
   2026-11-17): the name is written "LAMO"; the owner will supply a dark-mode word mark
   corrected to match.
-- Planned approach: server-triggered printing through a cloud print service with an
-  agent on a computer beside the printer, behind a `PrintProvider` interface, fed from a
-  `print_jobs` queue table. To be tried with the real printer before it is designed in.
+- **Trial result (owner, 2026-11-17).** Email print works: the order 1001 invoice PDF,
+  emailed as an attachment from the owner's Gmail and from LAMO's Gmail to the printer's
+  email address, printed correctly. No subject is needed; the printer's service replies
+  to the sender. The product supports several print routes behind one `PrintProvider`
+  interface fed from a `print_jobs` queue table: email print (sent through the
+  business's Votel sub-account and sender; the owner created one for LAMO), a print
+  service app on a Mac or Windows computer (for example PrintNode) for printers without
+  email print, and a manual Print button as the fallback. Open: the format of Votel's
+  `attachments` field (undocumented), to settle with one test send. Gmail sending was
+  considered and not chosen. Details in `docs/lamo-product-spec.md`, "Printing".
+- LAMO has two printers with email addresses. The first uses Epson Connect Email Print
+  and is the one proven above; its address was given by the owner and is kept out of the
+  repository (store printer addresses per business in the database, never in code or
+  public files). **Pending: the owner will supply the second printer's address.**
 
 **Out of scope for stage three**
 
