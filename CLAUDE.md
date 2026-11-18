@@ -100,7 +100,9 @@ all passed. Left:
    keep that working, and let someone mark the invoice delivered when signed on paper.
    On-screen signing on a phone: approved receivers per customer (several), picked from
    a list, or an ad hoc signer who types their name and signs, which creates a new
-   contact for that customer (Votel sync later). Shorts and refusals produce a credit
+   contact for that customer (Votel sync later). The screen asks "Did everything
+   arrive?": all received and sign; something's wrong, mark only the affected lines and
+   sign; or can't check now, sign "received, not checked". Shorts and refusals produce a credit
    memo; an issued invoice is never edited; full refusal voids it. Statuses: Draft,
    Issued, Delivered, Paid, Void. Unproven on the stack: a user uploading the signature
    from a phone under access rules. Full notes in `docs/lamo-product-spec.md`,

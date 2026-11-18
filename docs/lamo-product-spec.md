@@ -179,9 +179,20 @@ not a replacement for paper.
 - **Paper stays valid.** When the customer signs the paper copy, someone marks the invoice
   delivered in the app ("signed on paper"). Recommended: attach a photo of the signed
   copy as proof of delivery.
-- **On-screen signing, mobile first.** On a phone: the order's lines on a screen (not the
-  PDF), each marked Delivered, Short (with the quantity delivered) or Refused (with a
-  reason), then the receiver signs on screen.
+- **On-screen signing, mobile first: one question, then only the detail needed (owner,
+  2026-11-17; shaped with Claude).** The invoice is shown as a screen, not the PDF. It
+  first asks "Did everything arrive?":
+  - **Yes, all received:** the receiver signs. Delivered, approved in full.
+  - **Something's wrong:** every line starts as delivered; the receiver marks only the
+    affected lines as Short (with the quantity delivered), Damaged or Refused (with a
+    reason), then signs. Delivered with exceptions; a credit memo is created.
+  - **Can't check now:** the receiver signs "received, not checked" (freight carriers
+    call this "subject to count"). Delivered, pending check; the office gets a follow-up
+    task and no credit memo is made until it is resolved.
+  - A bare "not fine" with no lines named is not offered: it cannot produce a credit
+    memo and forces a phone call later.
+  - Per customer, an optional setting can require line-by-line checking (for example
+    hospitals).
 - **Who may sign (owner, 2026-11-17):** each customer has a list of approved receivers
   (several per customer). At the door the driver picks a name from that list and the
   receiver signs. Someone not on the list can sign ad hoc: they type their name, then
@@ -194,7 +205,8 @@ not a replacement for paper.
   LAMO invoices before delivery, so this is the model that fits, not finishing the
   invoice at the door.
 - **Invoice statuses:** Draft (editable, deletable) -> Issued (number locked, printed)
-  -> Delivered (signed on screen or on paper; credit memos for any exceptions) -> Paid;
+  -> Delivered (in full, with exceptions, or pending check; signed on screen or on paper;
+  credit memos for any exceptions) -> Paid;
   or Void (kept, with a reason).
 - The signature image is stored in the tenant's private bucket, readable only by members
   (proven for a sample signature written by the server; not yet proven for a user
