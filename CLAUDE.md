@@ -95,15 +95,25 @@ all passed. Left:
    LAMO's Epson printer address. Settles the undocumented `attachments` format. Needs
    LAMO's Votel sub-account API key set as a Supabase secret by the owner, and the
    sub-account's sender address on the printer's allowed-senders list.
-2. **Second printer's email address:** pending from the owner.
-3. **Votel support answers** (asked 2026-11-15): is `/api/emails/test` supported for
+2. **Signatures and delivery (planned for 2026-11-18, design first).** LAMO prints the
+   invoice before the truck leaves and the customer signs the paper copy at the door;
+   keep that working, and let someone mark the invoice delivered when signed on paper.
+   On-screen signing on a phone: approved receivers per customer (several), picked from
+   a list, or an ad hoc signer who types their name and signs, which creates a new
+   contact for that customer (Votel sync later). Shorts and refusals produce a credit
+   memo; an issued invoice is never edited; full refusal voids it. Statuses: Draft,
+   Issued, Delivered, Paid, Void. Unproven on the stack: a user uploading the signature
+   from a phone under access rules. Full notes in `docs/lamo-product-spec.md`,
+   "Delivery confirmation and signature".
+3. **Second printer's email address:** pending from the owner.
+4. **Votel support answers** (asked 2026-11-15): is `/api/emails/test` supported for
    production, plus the attachment format. Decides Votel or a dedicated email provider.
-4. **Product spec review:** `docs/lamo-product-spec.md` is a draft. The owner reviews its
+5. **Product spec review:** `docs/lamo-product-spec.md` is a draft. The owner reviews its
    flagged guesses (AI kept off finalise, delivery, signature, invites and "apply to all";
    a driver role; several ship-to addresses per customer; prices copied onto order
    lines; order entry in scope), then it moves to `stellara-ai/distributor-order-portal`
    under `docs/` (the owner said not to clone that repository yet).
-5. **Then stop this test and start the product.**
+6. **Then stop this test and start the product.**
 
 Not needed to finish the test (carried to the product): white-label icons and
 per-business manifest, the wrong-Votel-key check, session timeouts on Pro, MCP write

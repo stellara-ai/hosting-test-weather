@@ -171,11 +171,36 @@ screen)
 
 ### Delivery confirmation and signature
 
-- On a phone: one line per item on the delivery, each ticked as received, then the
-  receiver signs on screen.
+**LAMO's current practice (owner, 2026-11-17):** the invoice is printed before the truck
+leaves, carried to the customer, and signed on paper at the door. The app must not
+interrupt that. Automatic printing removes a trip back to the printer; it is a fail-safe,
+not a replacement for paper.
+
+- **Paper stays valid.** When the customer signs the paper copy, someone marks the invoice
+  delivered in the app ("signed on paper"). Recommended: attach a photo of the signed
+  copy as proof of delivery.
+- **On-screen signing, mobile first.** On a phone: the order's lines on a screen (not the
+  PDF), each marked Delivered, Short (with the quantity delivered) or Refused (with a
+  reason), then the receiver signs on screen.
+- **Who may sign (owner, 2026-11-17):** each customer has a list of approved receivers
+  (several per customer). At the door the driver picks a name from that list and the
+  receiver signs. Someone not on the list can sign ad hoc: they type their name, then
+  sign, and a new contact is created for that customer, marked "added at delivery".
+  Syncing these contacts to Votel comes later, not now.
+- **Shortages and refusals follow industry practice:** an issued invoice is never edited
+  or deleted. Short, damaged or refused lines produce a credit memo linked to the
+  invoice; the customer owes the invoice minus the credit memo. A fully refused or badly
+  wrong invoice is voided (it keeps its number and a reason) and reissued if needed.
+  LAMO invoices before delivery, so this is the model that fits, not finishing the
+  invoice at the door.
+- **Invoice statuses:** Draft (editable, deletable) -> Issued (number locked, printed)
+  -> Delivered (signed on screen or on paper; credit memos for any exceptions) -> Paid;
+  or Void (kept, with a reason).
 - The signature image is stored in the tenant's private bucket, readable only by members
-  (proven for a sample signature).
-- The signature appears on the invoice PDF.
+  (proven for a sample signature written by the server; not yet proven for a user
+  uploading from a phone). The signature and the receiver's name appear on the invoice
+  PDF and the credit memo.
+- Not decided: working without a phone signal at the door.
 
 ### PDF
 
