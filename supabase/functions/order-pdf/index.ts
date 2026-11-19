@@ -19,6 +19,7 @@ import {
 } from '../_shared/invoicePdf.ts'
 
 const ASSETS_BUCKET = 'tenant-assets'
+const PROOFS_BUCKET = 'delivery-proofs'
 const DOCUMENTS_BUCKET = 'tenant-documents'
 const LINK_SECONDS = 300
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -45,6 +46,15 @@ function projectKey(setName: string, legacyName: string): string {
   return legacy
 }
 
+interface DeliveryRow {
+  signature_path: string | null
+  signer_name: string | null
+  recorded_at: string
+  outcome: 'all_received' | 'exceptions' | 'not_checked' | 'signed_on_paper'
+  credit_skipped: boolean
+  no_credit_reason: string | null
+}
+
 interface OrderRow {
   id: string
   tenant_id: string
@@ -56,6 +66,8 @@ interface OrderRow {
   ordered_on: string
   shipped_on: string | null
   signature_path: string | null
+  deliveries: DeliveryRow[] | DeliveryRow | null
+  credit_memos: { number: string }[]
   order_lines: {
     position: number
     item_code: string | null
@@ -79,16 +91,22 @@ interface OrderRow {
 const ORDER_COLUMNS =
   'id, tenant_id, number, customer_name, bill_to_address, ship_to_name, ship_to_address, ' +
   'ordered_on, shipped_on, signature_path, ' +
+  'deliveries (signature_path, signer_name, recorded_at, outcome, credit_skipped, no_credit_reason), ' +
+  'credit_memos (number), ' +
   'order_lines (position, item_code, product, unit, quantity, unit_price_cents), ' +
   'tenants (name, address, email, phone, logo_path, primary_color, accent_color, invoice_settings)'
 
 /** Downloads a PNG or JPG the caller may read, or null (missing, other type, refused). */
-async function readImage(client: SupabaseClient, path: string | null): Promise<ImageBytes | null> {
+async function readImage(
+  client: SupabaseClient,
+  path: string | null,
+  bucket = ASSETS_BUCKET,
+): Promise<ImageBytes | null> {
   if (!path) return null
   const extension = path.split('.').pop()?.toLowerCase()
   const type = extension === 'png' ? 'png' : extension === 'jpg' || extension === 'jpeg' ? 'jpg' : null
   if (!type) return null
-  const { data, error } = await client.storage.from(ASSETS_BUCKET).download(path)
+  const { data, error } = await client.storage.from(bucket).download(path)
   if (error || !data) return null
   return { bytes: new Uint8Array(await data.arrayBuffer()), type }
 }
@@ -129,9 +147,15 @@ Deno.serve(async (req) => {
   const order = data as unknown as OrderRow | null
   if (!order?.tenants) return json({ error: 'Order not found' }, 404)
 
+  const delivery = (Array.isArray(order.deliveries) ? order.deliveries[0] : order.deliveries) ?? null
+  const deliverySignature = delivery?.signature_path ?? null
+  const creditMemo = order.credit_memos?.[0]?.number ?? null
   const [logo, signature] = await Promise.all([
     readImage(asCaller, order.tenants.logo_path),
-    readImage(asCaller, order.signature_path),
+    // The signature captured at delivery, if any; otherwise the seeded sample.
+    deliverySignature
+      ? readImage(asCaller, deliverySignature, PROOFS_BUCKET)
+      : readImage(asCaller, order.signature_path),
   ])
 
   const buildStarted = performance.now()
@@ -167,6 +191,20 @@ Deno.serve(async (req) => {
       logo,
       signature,
       generatedAt: new Date(),
+      delivery: delivery
+        ? {
+            signerName: delivery.signer_name,
+            date: delivery.recorded_at.slice(0, 10),
+            note: creditMemo
+              ? `Credit memo ${creditMemo}`
+              : delivery.credit_skipped
+                ? `Problems noted, no credit (${delivery.no_credit_reason ?? 'see office'})`
+                : delivery.outcome === 'not_checked'
+                  ? 'Received, not checked'
+                  : null,
+            onPaper: delivery.outcome === 'signed_on_paper',
+          }
+        : null,
     })
   } catch (error) {
     if (error instanceof TooManyLinesError) return json({ error: error.message }, 422)

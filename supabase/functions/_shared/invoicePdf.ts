@@ -168,6 +168,17 @@ export interface InvoiceData {
   /** PNG or JPG bytes of the delivery signature, or null when not signed yet. */
   signature: ImageBytes | null
   generatedAt: Date
+  /** The recorded delivery, printed beside the signature, or null when not delivered yet. */
+  delivery?: DeliveryNote | null
+}
+
+export interface DeliveryNote {
+  signerName: string | null
+  /** ISO date of the delivery, printed as 11/19/2026. */
+  date: string
+  /** A short note, for example "Credit memo CM-1002" or "Received, not checked". */
+  note: string | null
+  onPaper: boolean
 }
 
 export interface ImageBytes {
@@ -589,7 +600,22 @@ function drawBottomRow(page: PDFPage, ctx: PageContext, left: number, right: num
       height: signature.height * scale,
     })
   } else {
-    text(page, 'Not signed yet', left + 70, rowBottom + 24, fonts.regular, 9, { color: GREY })
+    const placeholder = ctx.data.delivery?.onPaper ? 'Signed on paper copy' : 'Not signed yet'
+    text(page, placeholder, left + 70, rowBottom + 24, fonts.regular, 9, { color: GREY })
+  }
+  // Who signed and when, beside the signature.
+  const delivery = ctx.data.delivery
+  if (delivery) {
+    const x = left + 250
+    const maxWidth = divider - x - 6
+    let y = rowTop - 22
+    if (delivery.signerName) {
+      text(page, delivery.signerName, x, y, fonts.bold, 9, { maxWidth })
+      y -= 12
+    }
+    text(page, `Delivered ${formatDate(delivery.date)}`, x, y, fonts.regular, 8, { maxWidth })
+    y -= 11
+    if (delivery.note) text(page, delivery.note, x, y, fonts.regular, 7.5, { color: GREY, maxWidth })
   }
   text(page, 'Total', divider + 12, rowBottom + 25, fonts.bold, 16)
   text(page, formatTotal(ctx.totalCents), right - 6, rowBottom + 26, fonts.bold, 11, {

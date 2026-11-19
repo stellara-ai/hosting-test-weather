@@ -1,5 +1,10 @@
 # CLAUDE.md
 
+> **Reference only (2026-11-19).** The proof of concept is complete and frozen at the git
+> tag `poc-complete`. The LAMO Distributor product is built in
+> `stellara-ai/distributor-order-portal`. Use this repository to see how something was
+> done (start with `docs/poc-reference.md`), not to build on.
+
 ## Purpose
 
 - This is a throwaway test app, not a product. It exists to prove the hosting, login,
@@ -90,31 +95,48 @@ Stages one to three are done: hosting, sign-in, secrets, email, tenants, brandin
 PDF spike (Part C), the MCP spike (Part F) and the printing trial (Part D, email print)
 all passed. Left:
 
-1. **Votel attachment test (planned for 2026-11-18).** One send through Votel's
+1. **Votel attachment test: pending, not blocking (owner, 2026-11-19: do not wait for
+   Votel's email approval; the test runs when it arrives).** One send through Votel's
    `/api/emails/test` with the invoice PDF attached, first to the owner's inbox, then to
-   LAMO's Epson printer address. Settles the undocumented `attachments` format. Needs
-   LAMO's Votel sub-account API key set as a Supabase secret by the owner, and the
-   sub-account's sender address on the printer's allowed-senders list.
-2. **Signatures and delivery (planned for 2026-11-18, design first).** LAMO prints the
-   invoice before the truck leaves and the customer signs the paper copy at the door;
-   keep that working, and let someone mark the invoice delivered when signed on paper.
-   On-screen signing on a phone: approved receivers per customer (several), picked from
-   a list, or an ad hoc signer who types their name and signs, which creates a new
-   contact for that customer (Votel sync later). The screen asks "Did everything
-   arrive?": all received and sign; something's wrong, mark only the affected lines and
-   sign; or can't check now, sign "received, not checked". Shorts and refusals produce a credit
-   memo; an issued invoice is never edited; full refusal voids it. Statuses: Draft,
-   Issued, Delivered, Paid, Void. Unproven on the stack: a user uploading the signature
-   from a phone under access rules. Full notes in `docs/lamo-product-spec.md`,
-   "Delivery confirmation and signature".
-3. **Second printer's email address:** pending from the owner.
-4. **Votel support answers** (asked 2026-11-15): is `/api/emails/test` supported for
+   LAMO's Epson printer address. Settles the undocumented `attachments` format. Status
+   (2026-11-18): the owner is creating a LAMO Votel sub-account; its sender email is
+   waiting for approval, so the test is on hold. The owner says no allowed-senders
+   change is needed on the printer. The test could also run from the existing
+   `support@stellarasystems.com` sender, since only the format is being checked. Owner
+   (2026-11-18): the real test is sending from a `lamodistributor.com` address; sender
+   decided: `print@lamodistributor.com` (owner, 2026-11-18), for print jobs only. The
+   domain has no mail records (checked 2026-11-18: no MX, no SPF; a DMARC record with
+   `p=quarantine` from the domain host), so it cannot receive email: set reply-to to
+   LAMO's Gmail so printer replies reach someone, and add Votel's SPF and DKIM records in
+   GoDaddy, or DMARC will quarantine the mail.
+2. **Signatures and delivery: built and tried on a phone (2026-11-19).** Migrations
+   `20261119230000_deliveries.sql` and `20261119240000_optional_credit_memo.sql`, route
+   `/deliver/:orderId` (`DeliveryView.vue`, `SignaturePad.vue` on the browser canvas, no
+   library), office alerts on `/account`, and the PDF now prints the delivery signature,
+   the signer, the date and a credit note. Owner's results on an iPhone over the local
+   network: a signature drawn on the phone uploaded and saved under access rules; an ad
+   hoc signer was added to the customer's list and the office alerted; a credit memo
+   (CM-1002) was issued for a refused line; the signed invoice PDF downloads. Signed-out
+   callers are refused reading alerts, uploading to `delivery-proofs` and calling
+   `record_delivery` (checked 2026-11-19). Decisions: any member, including drivers,
+   records deliveries; approved signers per customer; a credit memo is never automatic
+   (off by default, the business decides, never the client); the customer signs, then
+   the phone goes back to the driver for the credit choice; customer view is the default
+   and a driver mode unlocked on the spot is for the product. Scenarios and business
+   settings are in `docs/lamo-product-spec.md`, "Delivery scenarios and business
+   settings". Not yet tried: a tablet, Android, a second business reading another's
+   signature file, and the credit switch left off end to end. Bug found and fixed: phones
+   on plain `http` lack `crypto.randomUUID()`.
+3. ~~Second printer's email address~~: done 2026-11-18 (Brother; both printers proven).
+4. **Votel support answers: pending, not blocking (owner, 2026-11-19).** Votel is looking
+   into the email campaign, phone number and test-email issues. Asked 2026-11-15: is `/api/emails/test` supported for
    production, plus the attachment format. Decides Votel or a dedicated email provider.
-5. **Product spec review:** `docs/lamo-product-spec.md` is a draft. The owner reviews its
-   flagged guesses (AI kept off finalise, delivery, signature, invites and "apply to all";
-   a driver role; several ship-to addresses per customer; prices copied onto order
-   lines; order entry in scope), then it moves to `stellara-ai/distributor-order-portal`
-   under `docs/` (the owner said not to clone that repository yet).
+5. ~~Product spec review~~: done 2026-11-19. The owner settled the five flagged guesses
+   (recorded in `docs/lamo-product-spec.md`): person-only actions stay with people by
+   default, with an opt-in AI autonomy mode per business; a driver role; several
+   locations per customer, each with its own name; prices copied onto lines, with
+   corrections by void and "Copy invoice"; AI-driven order entry with a deliberately
+   hard approval step.
 6. **Then stop this test and start the product.**
 
 Not needed to finish the test (carried to the product): white-label icons and
@@ -443,8 +465,8 @@ Each business sets up its own invoice; nothing below is fixed in code:
   LAMO's logo and colours from there, never make a placeholder (owner, 2026-11-17). The
   light-mode word mark is used on white (the PDF and the app, which has no dark mode);
   primary Warm Brown `#521F12`, accent Leaf Green `#527A38`. Settled (owner,
-  2026-11-17): the name is written "LAMO"; the owner will supply a dark-mode word mark
-  corrected to match.
+  2026-11-17): the name is written "LAMO". Done (owner, 2026-11-18): the dark-mode word
+  mark now reads "LAMO" too, so the word marks match.
 - **Trial result (owner, 2026-11-17).** Email print works: the order 1001 invoice PDF,
   emailed as an attachment from the owner's Gmail and from LAMO's Gmail to the printer's
   email address, printed correctly. No subject is needed; the printer's service replies
@@ -455,10 +477,11 @@ Each business sets up its own invoice; nothing below is fixed in code:
   email print, and a manual Print button as the fallback. Open: the format of Votel's
   `attachments` field (undocumented), to settle with one test send. Gmail sending was
   considered and not chosen. Details in `docs/lamo-product-spec.md`, "Printing".
-- LAMO has two printers with email addresses. The first uses Epson Connect Email Print
-  and is the one proven above; its address was given by the owner and is kept out of the
-  repository (store printer addresses per business in the database, never in code or
-  public files). **Pending: the owner will supply the second printer's address.**
+- LAMO has two printers with email addresses, both proven (owner, 2026-11-18): an Epson
+  (Epson Connect Email Print) and a Brother (Brother's email print service). Each printed
+  the invoice PDF sent from LAMO's Gmail and from the owner's Gmail. The addresses were
+  given by the owner and are kept out of the repository (store printer addresses per
+  business in the database, never in code or public files).
 
 **Out of scope for stage three**
 

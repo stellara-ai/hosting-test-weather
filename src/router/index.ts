@@ -36,6 +36,13 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // Delivery confirmation and signing, phone and tablet first.
+      path: '/deliver/:orderId',
+      name: 'deliver',
+      component: () => import('@/views/DeliveryView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // Supabase Auth's OAuth server sends people here to approve an outside app.
       path: '/oauth/consent',
       name: 'oauth-consent',

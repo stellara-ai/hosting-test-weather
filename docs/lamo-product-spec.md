@@ -94,9 +94,12 @@ QuickBooks, the Votel contact sync, passkeys. Each can be added later.
 
 ### Customers
 
-- A `customers` table per tenant: name, bill-to address, one or more ship-to addresses,
-  contact, and an optional invoice layout. (The test stored the customer as text on each
-  order; the product must not.)
+- A `customers` table per tenant: name, bill-to address, contact, and an optional invoice
+  layout. (The test stored the customer as text on each order; the product must not.)
+- **Locations (owner, 2026-11-19):** one customer can have several delivery locations,
+  for example a hospital billed centrally with a main kitchen and a cafeteria dock. Each
+  location has its own name, which can differ from the customer's (it prints as the Ship
+  To name), its own address, and its own approved signers.
 
 ### Products catalog
 
@@ -185,7 +188,8 @@ not a replacement for paper.
   - **Yes, all received:** the receiver signs. Delivered, approved in full.
   - **Something's wrong:** every line starts as delivered; the receiver marks only the
     affected lines as Short (with the quantity delivered), Damaged or Refused (with a
-    reason), then signs. Delivered with exceptions; a credit memo is created.
+    reason), then signs. Delivered with exceptions; the business decides on a credit
+    (never automatic, see "Delivery scenarios and business settings").
   - **Can't check now:** the receiver signs "received, not checked" (freight carriers
     call this "subject to count"). Delivered, pending check; the office gets a follow-up
     task and no credit memo is made until it is resolved.
@@ -199,8 +203,9 @@ not a replacement for paper.
   sign, and a new contact is created for that customer, marked "added at delivery".
   Syncing these contacts to Votel comes later, not now.
 - **Shortages and refusals follow industry practice:** an issued invoice is never edited
-  or deleted. Short, damaged or refused lines produce a credit memo linked to the
-  invoice; the customer owes the invoice minus the credit memo. A fully refused or badly
+  or deleted. When the business credits short, damaged or refused lines, it issues a
+  credit memo linked to the invoice; the customer owes the invoice minus the credit
+  memo. The credit is a decision, never automatic (owner, 2026-11-19). A fully refused or badly
   wrong invoice is voided (it keeps its number and a reason) and reissued if needed.
   LAMO invoices before delivery, so this is the model that fits, not finishing the
   invoice at the door.
@@ -213,6 +218,119 @@ not a replacement for paper.
   uploading from a phone). The signature and the receiver's name appear on the invoice
   PDF and the credit memo.
 - Not decided: working without a phone signal at the door.
+
+### Delivery scenarios and business settings (owner, 2026-11-19; proposed with Claude)
+
+**Principles**
+
+- **The business decides money, never the client.** The client records what arrived and
+  signs. Credits, voids and redeliveries are decided by the business: the driver at the
+  door (if the business allows it) or the office. A client can *request* a credit; it
+  cannot issue one, unless the business turns that on (see settings).
+- **A credit memo is never automatic.** Problems are always recorded; the credit is a
+  separate decision.
+- **Two devices, one record.** The client's approved signers can open the delivery on
+  their own phone (the PWA) and check and sign there, or sign on the driver's device.
+  Either way it is the same delivery record.
+- **Nothing is lost if nobody signs.** An unsigned delivery is recorded with proof
+  (time, photo, location) and the invoice stays open until it is resolved.
+
+**Scenarios and how each is handled**
+
+| # | Scenario | Handling |
+|---|---|---|
+| 1 | Clean delivery | Client confirms everything and signs (own phone or driver's). Invoice: Delivered. |
+| 2 | Client checks items on their own phone while the driver unloads | Driver taps Deliver; the client's approved signers get a notice and open the checklist in the PWA; the driver's screen updates live; client signs. |
+| 3 | Short-loaded, known before the truck leaves | Warehouse marks the lines short at loading; the client sees the expected quantities, so nothing is a surprise at the door. Remaining items go on a backorder. |
+| 4 | Short or damaged at the door, client accepts the rest | Client marks the lines and signs for what arrived. Business choice per setting: driver issues a credit now, the office decides later (default), or the missing items are redelivered on the same invoice. |
+| 5 | Wrong item; driver offers a substitute | Client accepts or refuses the substitute line. A substitute at a different price needs the business's approval before it is final. |
+| 6 | Client refuses the whole delivery (quality, temperature, late) | Driver records the refusal with reason and photo; goods return. Invoice: Refused, then the office voids and reissues or reschedules. |
+| 7 | Client refuses to sign at all (dispute, or no authorised person) | Driver records "unsigned" with proof (time, photo, location) and a note. Invoice stays open as Awaiting signature; the client can still sign later from the PWA within the signing window, or the office follows up. |
+| 8 | Nobody on site (early-morning dock drop) | "Left at dock" with photo and location. Client's signers get a notice and confirm in the PWA later. Optional: treat as accepted after a set number of hours if nothing is reported. |
+| 9 | Person present is not on the approved list | Allowed and flagged (current build): they are added "at delivery" and the office is alerted. Business can instead block ad hoc signers. |
+| 10 | Signed "received, not checked"; problem found later | Client reports problem lines from the PWA within the claim window. This creates a credit *request* for the office, not a credit. |
+| 11 | Over-delivery or extra items | Client marks extras; driver takes them back, or the office adds them as a separate charge after approval. |
+| 12 | Price disagreement at the door | Not the driver's call. Recorded as a note; client signs for the goods; the office resolves the price. |
+| 13 | Partial delivery, rest later | Delivered lines are signed now; open lines stay on the invoice as "to deliver". The next delivery completes it; the invoice closes when everything is delivered or credited. |
+| 14 | Paper copy signed (current LAMO practice) | Mark "signed on paper", optional photo of the signed copy. |
+
+**Invoice delivery statuses (extends Draft, Issued, Delivered, Paid, Void)**
+
+Issued -> Out for delivery -> Delivered / Delivered with problems / Partially delivered /
+Awaiting signature / Refused. "Delivered with problems" carries a credit decision:
+pending (default), credited, redeliver, or no credit.
+
+**Settings per business, overridable per customer**
+
+| Setting | Options | Suggested default for LAMO |
+|---|---|---|
+| Where signing happens | Driver's device · client's own device · either | Either |
+| Client signs later from the PWA | Off · on, within N hours | On, 24 hours |
+| Ad hoc signers (not on the approved list) | Block · allow and alert office | Allow and alert |
+| Line checking | Optional · required (for example hospitals) | Optional; required per customer |
+| Credit at delivery | Never at the door (office decides) · driver/member may issue · admin only | Driver may issue; default off |
+| Credit draft for the office | None · draft credit created for approval | Draft for approval |
+| Client may request a credit | Off · on, within claim window N hours | On, 24 hours |
+| Client may self-credit | Off · on up to $X per delivery | Off |
+| Unsigned delivery | Not allowed · allowed with photo and location | Allowed with proof |
+| Auto-accept if client does not respond | Off · after N hours | Off |
+| Partial delivery | Keep open lines to redeliver · credit them · office decides | Office decides |
+| Refused delivery | Hold for office · void and reissue | Hold for office |
+| Proof required on problems | None · photo · photo and location | Photo |
+
+**Agreed refinements (owner, 2026-11-19)**
+
+- **One-time links for client signers.** When the driver taps Deliver, the customer's
+  approved signers get a one-time text link that opens the delivery in the PWA, with no
+  password. Full client accounts stay optional, since dock staff change often.
+- **Open invoices have a time limit.** An invoice awaiting signature or delivery raises
+  an alert after a set number of days; the office then redelivers, credits or closes it.
+- **The driver's device is always a fallback.** No signal at the dock, or a receiver
+  without the app, never stops a delivery. Working offline (record now, send when the
+  signal returns) is a product requirement.
+- **Draft credits.** When the office decides later, the system prepares a draft credit
+  memo from the recorded problems and waits for approval; nothing is issued without it.
+
+**Customer view by default; driver mode on demand (owner, 2026-11-19)**
+
+- The delivery screen opens in **customer view**, even on the driver's own phone, because
+  the driver may show it to the receiver at any moment. Customer view shows only what
+  the receiver may do: check items, choose who signs, sign. No money decisions, no
+  prices beyond the delivery's totals, no other orders.
+- The driver switches to **driver mode** on the spot to do anything special: issue a
+  credit, record a refusal or an unsigned delivery, change the signer list, reprint. It
+  needs a quick unlock the receiver cannot pass: the phone's own Face ID or fingerprint
+  through a passkey (works in a PWA), or a short personal PIN as a fallback.
+- Driver mode locks again by itself after a short idle time and whenever the delivery
+  screen is left, so the phone is never handed over unlocked.
+- The test builds a simpler version: the customer signs, then a "hand the phone back to
+  the driver" screen holds the credit choice. No unlock yet.
+- Still to decide (owner): exactly which actions need driver mode, and the idle time.
+
+**AI in the field (owner, 2026-11-19)**
+
+A driver or other business user can tell the assistant, typed or spoken, "apply a credit
+of two cases for the bananas on order 1002" while at the door. The assistant follows
+"AI proposes, code commits":
+
+1. It turns the request into a proposed `issue_credit_memo` call: the order, the lines,
+   the quantities and the reason. Prices and totals come from the order, never from the
+   model.
+2. The proposal appears on the user's screen as a plain summary ("Credit 2 cases of
+   Bananas, $49.00, on order 1002").
+3. One tap confirms it; code then checks the user's role and the business's credit
+   setting, issues the credit memo and records who asked, by voice or text, and who
+   confirmed. Autonomy level 1 (confirm every change) is the default; a business could
+   later allow small credits under a set amount to apply without the tap.
+4. Client users never get this tool; the business decides money.
+5. Spanish and English, spoken in a noisy dock, are expected; the speech pipeline and
+   accuracy checks in CLAUDE.md's AI-first section apply.
+
+**Built in the test (2026-11-19):** driver-device signing, approved signers per
+customer, ad hoc signers with an office alert, the checklist (one by one or select all),
+"can't check now", "signed on paper" with photo, office alerts, and an optional credit
+memo that is off by default (scenarios 1, 4, 9, 14 and part of 10). Everything else
+above is for the product.
 
 ### PDF
 
@@ -281,7 +399,8 @@ not a replacement for paper.
 
 ### Users and access
 
-- Roles: admin and member per tenant (proven). A driver role is likely; to decide.
+- Roles: admin, member and driver per tenant (admin and member proven; driver decided
+  and built in the test, 2026-11-19).
 - Invitation: a tenant admin enters an address; an Edge Function creates the user and the
   membership.
 - The tenant is chosen from the subdomain (the test took the first membership).
@@ -345,11 +464,35 @@ person acting directly on a screen is the confirmation.
 | `set_customer_layout` | Write | Yes | A | S, As | Proposed |
 | `apply_layout_to_all_customers` | Write | Yes, with the count of customers affected | A | S | Proposed |
 | `invite_user` | Write | Yes | A | S | Proposed |
+| `issue_credit_memo` | Write | Yes, with the lines and amount shown | A, M, D (business only, per setting) | S, As (typed or spoken) | Proposed: see "AI in the field". Never available to client users |
+| `request_credit` | Write | Yes | Client signers | S (client PWA) | Proposed: creates a request for the office, not a credit |
 
 Proposed reasoning for the narrower rows: finalising, delivery and signatures, and
 inviting people are the confirmations that matter (the "north star": people give the
-confirmations that matter), so they stay on screens. Roles for member versus a future
-driver role are to be confirmed.
+confirmations that matter), so they stay on screens by default.
+
+**AI autonomy mode (owner, 2026-11-19).** A business owner who is comfortable with it can
+let the AI carry out these person-only actions too, per action, as a business setting
+that is off by default and changed only by an admin. Every AI-run action is logged with
+who asked, what was proposed and what was done, and can be reviewed and undone where the
+action allows it (a finalised invoice is voided and reissued, never edited).
+
+**Copy invoice (owner, 2026-11-19).** An issued invoice is never edited. To correct one,
+for example a price entered wrongly, the office voids it (it keeps its number and a
+reason) and uses "Copy invoice": a new draft with the same lines, editable, which is
+then issued as a new invoice. Prices on order and invoice lines are copied from the
+catalog when the line is added, so later catalog changes never alter past documents;
+a person can still change a line's price by hand while it is a draft.
+
+**AI order entry, hard to approve (owner, 2026-11-19).** Customers place orders by
+speaking or typing to the assistant ("two cases of bananas and the usual bread for
+tomorrow"); it understands the request and fills in a draft order from the catalog and
+the customer's history. A person then approves it. Approving an order is deliberately
+hard to do by accident, because customers may later say they never placed it (a child
+had the phone): a step-up check such as Face ID or a fingerprint through a passkey, or
+a PIN, a clear summary with the total before the final tap, and a record of who
+approved, on which device and when. A business may let trusted staff approve their own
+AI-drafted orders with less friction; customers' approvals always use the step-up.
 
 ---
 
@@ -429,7 +572,5 @@ actually running them.
 | Neutral answer when the one-code-per-minute limit is hit | The current message reveals that an address has an account | Phase 0 |
 | Pin the host's build to the lockfile, or upload a tested `dist` | Votel's assistant once fell back to `npm install` | Phase 0 |
 | OpenRouter account, first model, privacy settings | Before any real client data reaches a model | Owner, before phase 4 |
-| A driver role | Delivery is done by drivers on phones | Owner, before phase 3 |
 | Printing provider | Depends on the printing trial | Trial result |
-| Dark-mode word mark corrected to "LAMO" | For dark backgrounds | Owner |
 | For large tables, move the membership check into a `security definer` function or a JWT claim | Fine at LAMO's size; the documented next step if queries slow | Later |

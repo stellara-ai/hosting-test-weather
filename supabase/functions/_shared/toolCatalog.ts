@@ -69,7 +69,7 @@ interface OrderRow {
   customer_name: string
   ordered_on: string
   shipped_on: string | null
-  signature_path: string | null
+  status: string
   order_lines: { quantity: number; unit_price_cents: number }[]
 }
 
@@ -78,7 +78,7 @@ export const listOrders = defineTool({
   title: 'List orders',
   description:
     "Lists the orders of the signed-in user's business, newest first: order number, customer, " +
-    'order and ship dates, number of lines, total in US dollars, and whether delivery was signed. ' +
+    'order and ship dates, number of lines, total in US dollars, and status (issued, delivered, paid or void). ' +
     'Read-only. Prices and totals come from the database; do not estimate them.',
   input: {
     limit: z
@@ -98,7 +98,7 @@ export const listOrders = defineTool({
   async run({ db }, { limit }) {
     const { data, error } = await db
       .from('orders')
-      .select('number, customer_name, ordered_on, shipped_on, signature_path, order_lines (quantity, unit_price_cents)')
+      .select('number, customer_name, ordered_on, shipped_on, status, order_lines (quantity, unit_price_cents)')
       .order('ordered_on', { ascending: false })
       .order('number', { ascending: false })
       .limit(limit ?? 20)
@@ -113,7 +113,7 @@ export const listOrders = defineTool({
         lineCount: order.order_lines.length,
         total: (totalCents / 100).toFixed(2),
         currency: 'USD',
-        deliverySigned: order.signature_path !== null,
+        status: order.status,
       }
     })
   },

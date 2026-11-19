@@ -19,6 +19,14 @@ const lastPdf = ref<{ number: string; link: OrderPdfLink } | null>(null)
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
+const STATUS_TEXT: Record<OrderSummary['status'], string> = {
+  draft: 'Draft',
+  issued: 'Issued',
+  delivered: 'Delivered',
+  paid: 'Paid',
+  void: 'Void',
+}
+
 function messageFor(error: unknown, fallback: string): string {
   return error instanceof BackendError ? error.message : fallback
 }
@@ -77,9 +85,18 @@ onMounted(load)
           <p class="truncate font-medium">Order {{ order.number }} · {{ order.customerName }}</p>
           <p class="text-sm text-slate-600">
             {{ order.orderedOn }} · {{ money.format(order.totalCents / 100) }} ·
-            {{ order.signed ? 'Signed' : 'Not signed yet' }}
+            <span :class="order.status === 'delivered' ? 'font-medium text-green-800' : ''">{{
+              STATUS_TEXT[order.status]
+            }}</span>
           </p>
         </div>
+        <RouterLink
+          v-if="order.status === 'issued'"
+          :to="{ name: 'deliver', params: { orderId: order.id } }"
+          class="shrink-0 rounded-lg border-2 border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-slate-50"
+        >
+          Deliver
+        </RouterLink>
         <button
           type="button"
           class="shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white hover:brightness-90 disabled:opacity-60"
